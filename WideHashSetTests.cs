@@ -1,0 +1,99 @@
+namespace WideCollections;
+
+[TestClass]
+public sealed class WideHashSetTests {
+    [TestMethod]
+    public void Add_DeduplicatesValues() {
+        WideHashSet<int> set = new();
+
+        Assert.IsTrue(set.Add(1));
+        Assert.IsFalse(set.Add(1));
+        Assert.IsTrue(set.Add(2));
+        Assert.AreEqual(2L, set.Count);
+    }
+
+    [TestMethod]
+    public void RemoveAndContains_WorkAsExpected() {
+        WideHashSet<int> set = new();
+        set.Add(10);
+        set.Add(20);
+
+        Assert.IsTrue(set.Contains(10));
+        Assert.IsTrue(set.Remove(10));
+        Assert.IsFalse(set.Contains(10));
+        Assert.IsFalse(set.Remove(10));
+        Assert.AreEqual(1L, set.Count);
+    }
+
+    [TestMethod]
+    public void CopyTo_CopiesAllElements() {
+        WideHashSet<int> set = new();
+        set.Add(3);
+        set.Add(5);
+        set.Add(7);
+        WideArray<int> destination = new(5);
+
+        set.CopyTo(destination, 1);
+
+        int[] copied = [destination[1], destination[2], destination[3]];
+        CollectionAssert.AreEquivalent(new[] { 3, 5, 7 }, copied);
+    }
+
+    [TestMethod]
+    public void UnionIntersectExceptAndSymmetricExcept_WorkLikeHashSet() {
+        WideHashSet<int> set = new([1, 2, 3]);
+
+        set.UnionWith([3, 4, 5]);
+        CollectionAssert.AreEquivalent(new[] { 1, 2, 3, 4, 5 }, set.ToArray());
+
+        set.IntersectWith([2, 4, 9]);
+        CollectionAssert.AreEquivalent(new[] { 2, 4 }, set.ToArray());
+
+        set.ExceptWith([4]);
+        CollectionAssert.AreEquivalent(new[] { 2 }, set.ToArray());
+
+        set.SymmetricExceptWith([2, 3, 3, 4]);
+        CollectionAssert.AreEquivalent(new[] { 3, 4 }, set.ToArray());
+    }
+
+    [TestMethod]
+    public void SubsetSupersetAndSetEquals_UseSetSemantics() {
+        WideHashSet<int> set = new([1, 2, 3]);
+
+        Assert.IsTrue(set.IsSubsetOf([1, 2, 3, 4]));
+        Assert.IsTrue(set.IsProperSubsetOf([1, 2, 3, 4]));
+        Assert.IsTrue(set.IsSupersetOf([1, 3]));
+        Assert.IsTrue(set.IsProperSupersetOf([1, 3]));
+        Assert.IsTrue(set.SetEquals([3, 2, 1, 1]));
+        Assert.IsFalse(set.SetEquals([1, 2]));
+    }
+
+    [TestMethod]
+    public void Overlaps_ReturnsTrueWhenAnyElementMatches() {
+        WideHashSet<int> set = new([8, 9]);
+
+        Assert.IsTrue(set.Overlaps([9, 10]));
+        Assert.IsFalse(set.Overlaps([10, 11]));
+    }
+
+    [TestMethod]
+    public void Constructor_UsesComparerForEquality() {
+        WideHashSet<string> set = new(StringComparer.OrdinalIgnoreCase);
+        set.Add("abc");
+
+        Assert.IsTrue(set.Contains("ABC"));
+        Assert.IsFalse(set.Add("AbC"));
+        Assert.AreEqual(1L, set.Count);
+    }
+
+    [TestMethod]
+    public void Enumerator_ThrowsWhenModifiedDuringEnumeration() {
+        WideHashSet<int> set = new([1, 2, 3]);
+        using var enumerator = set.GetEnumerator();
+        Assert.IsTrue(enumerator.MoveNext());
+
+        set.Add(4);
+
+        Assert.Throws<InvalidOperationException>(() => enumerator.MoveNext());
+    }
+}
