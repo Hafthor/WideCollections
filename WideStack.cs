@@ -1,10 +1,12 @@
 using System.Collections;
+using System.Runtime.CompilerServices;
 
 namespace WideCollections;
 
 public class WideStack<T> : IEnumerable<T>, IWideCollection, IWideReadOnlyCollection<T>, ICompactable {
-    private WideArray<T> _items;
+    private readonly WideArray<T> _items;
     private long _count;
+    private static readonly bool ContainsReferences = RuntimeHelpers.IsReferenceOrContainsReferences<T>();
 
     public WideStack() {
         _items = new WideArray<T>();
@@ -12,8 +14,7 @@ public class WideStack<T> : IEnumerable<T>, IWideCollection, IWideReadOnlyCollec
     }
 
     public WideStack(long capacity) {
-        if (capacity < 0)
-            throw new ArgumentOutOfRangeException(nameof(capacity), "Capacity cannot be negative.");
+        ArgumentOutOfRangeException.ThrowIfNegative(capacity);
 
         _items = new WideArray<T>(capacity);
         SyncRoot = new object();
@@ -33,8 +34,7 @@ public class WideStack<T> : IEnumerable<T>, IWideCollection, IWideReadOnlyCollec
     public long Capacity {
         get => _items.Length;
         set {
-            if (value < _count)
-                throw new ArgumentOutOfRangeException(nameof(value), "Capacity cannot be less than Count.");
+            ArgumentOutOfRangeException.ThrowIfLessThan(value, _count);
 
             if (value != _items.Length)
                 _items.Resize(value);
@@ -53,7 +53,7 @@ public class WideStack<T> : IEnumerable<T>, IWideCollection, IWideReadOnlyCollec
         if (_count == 0)
             return;
 
-        if (!typeof(T).IsValueType) {
+        if (ContainsReferences) {
             for (long i = 0; i < _count; i++)
                 _items[i] = default!;
         }
@@ -63,25 +63,18 @@ public class WideStack<T> : IEnumerable<T>, IWideCollection, IWideReadOnlyCollec
 
     public bool Contains(T item) {
         var comparer = EqualityComparer<T>.Default;
-        for (long i = _count - 1; i >= 0; i--) {
+        for (long i = _count - 1; i >= 0; i--)
             if (comparer.Equals(_items[i], item))
                 return true;
-        }
 
         return false;
     }
 
     public void CopyTo(WideArray<T> array, long arrayIndex) {
         ArgumentNullException.ThrowIfNull(array);
-
-        if (arrayIndex < 0)
-            throw new ArgumentOutOfRangeException(nameof(arrayIndex), "Index cannot be negative.");
-
-        if (arrayIndex > array.Length)
-            throw new ArgumentOutOfRangeException(nameof(arrayIndex), "Index exceeds destination length.");
-
-        if (array.Length - arrayIndex < _count)
-            throw new ArgumentException("Destination does not have enough space.", nameof(array));
+        ArgumentOutOfRangeException.ThrowIfNegative(arrayIndex);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(arrayIndex, array.Length);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(_count, array.Length - arrayIndex);
 
         for (long i = 0; i < _count; i++)
             array[arrayIndex + i] = _items[_count - 1 - i];
@@ -111,7 +104,7 @@ public class WideStack<T> : IEnumerable<T>, IWideCollection, IWideReadOnlyCollec
         long topIndex = _count - 1;
         T item = _items[topIndex];
 
-        if (!typeof(T).IsValueType)
+        if (ContainsReferences)
             _items[topIndex] = default!;
 
         _count = topIndex;
@@ -127,7 +120,7 @@ public class WideStack<T> : IEnumerable<T>, IWideCollection, IWideReadOnlyCollec
         long topIndex = _count - 1;
         result = _items[topIndex];
 
-        if (!typeof(T).IsValueType)
+        if (ContainsReferences)
             _items[topIndex] = default!;
 
         _count = topIndex;

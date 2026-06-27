@@ -167,8 +167,7 @@ public class WideSortedDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>,
     bool IWideDictionary.Contains(object key) => key is TKey typedKey && ContainsKey(typedKey);
 
     void IWideDictionary.Remove(object key) {
-        if (key is null)
-            throw new ArgumentNullException(nameof(key));
+        ArgumentNullException.ThrowIfNull(key);
 
         if (key is TKey typedKey)
             Remove(typedKey);
@@ -180,12 +179,9 @@ public class WideSortedDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>,
 
     public void CopyTo(WideArray<KeyValuePair<TKey, TValue>> array, long arrayIndex) {
         ArgumentNullException.ThrowIfNull(array);
-        if (arrayIndex < 0)
-            throw new ArgumentOutOfRangeException(nameof(arrayIndex), "Index cannot be negative.");
-        if (arrayIndex > array.Length)
-            throw new ArgumentOutOfRangeException(nameof(arrayIndex), "Index exceeds destination length.");
-        if (array.Length - arrayIndex < Count)
-            throw new ArgumentException("Destination does not have enough space.", nameof(array));
+        ArgumentOutOfRangeException.ThrowIfNegative(arrayIndex);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(arrayIndex, array.Length);
+        ArgumentOutOfRangeException.ThrowIfLessThan(array.Length - arrayIndex, Count);
 
         for (long i = 0; i < Count; i++)
             array[arrayIndex + i] = _items[i];
@@ -216,15 +212,14 @@ public class WideSortedDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>,
     }
 
     private static void ValidateObjectKey(object key) {
-        if (key is null)
-            throw new ArgumentNullException(nameof(key));
+        ArgumentNullException.ThrowIfNull(key);
         if (key is not TKey)
             throw new ArgumentException($"Key must be of type {typeof(TKey)}.", nameof(key));
     }
 
     private static void ValidateObjectValue(object value) {
-        if (value is null && default(TValue) is not null)
-            throw new ArgumentNullException(nameof(value));
+        if (default(TValue) is not null)
+            ArgumentNullException.ThrowIfNull(value);
         if (value is not TValue && (value is not null || default(TValue) is not null))
             throw new ArgumentException($"Value must be of type {typeof(TValue)}.", nameof(value));
     }
@@ -311,12 +306,9 @@ public class WideSortedDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>,
 
         public void CopyTo(WideArray<TKey> array, long arrayIndex) {
             ArgumentNullException.ThrowIfNull(array);
-            if (arrayIndex < 0)
-                throw new ArgumentOutOfRangeException(nameof(arrayIndex), "Index cannot be negative.");
-            if (arrayIndex > array.Length)
-                throw new ArgumentOutOfRangeException(nameof(arrayIndex), "Index exceeds destination length.");
-            if (array.Length - arrayIndex < Count)
-                throw new ArgumentException("Destination does not have enough space.", nameof(array));
+            ArgumentOutOfRangeException.ThrowIfNegative(arrayIndex);
+            ArgumentOutOfRangeException.ThrowIfGreaterThan(arrayIndex, array.Length);
+            ArgumentOutOfRangeException.ThrowIfLessThan(array.Length - arrayIndex, Count);
 
             for (long i = 0; i < _dictionary.Count; i++)
                 array[arrayIndex + i] = _dictionary._items[i].Key;
@@ -348,12 +340,9 @@ public class WideSortedDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>,
 
         public void CopyTo(WideArray<TValue> array, long arrayIndex) {
             ArgumentNullException.ThrowIfNull(array);
-            if (arrayIndex < 0)
-                throw new ArgumentOutOfRangeException(nameof(arrayIndex), "Index cannot be negative.");
-            if (arrayIndex > array.Length)
-                throw new ArgumentOutOfRangeException(nameof(arrayIndex), "Index exceeds destination length.");
-            if (array.Length - arrayIndex < Count)
-                throw new ArgumentException("Destination does not have enough space.", nameof(array));
+            ArgumentOutOfRangeException.ThrowIfNegative(arrayIndex);
+            ArgumentOutOfRangeException.ThrowIfGreaterThan(arrayIndex, array.Length);
+            ArgumentOutOfRangeException.ThrowIfLessThan(array.Length - arrayIndex, Count);
 
             for (long i = 0; i < _dictionary.Count; i++)
                 array[arrayIndex + i] = _dictionary._items[i].Value;

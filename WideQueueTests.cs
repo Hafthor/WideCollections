@@ -110,4 +110,29 @@ public sealed class WideQueueTests {
         Assert.AreEqual(queue.Count, queue.Capacity);
         CollectionAssert.AreEqual(new[] { 17, 18, 19 }, queue.ToArray());
     }
+
+    [TestMethod]
+    public void Dequeue_ClearsRemovedReferenceForGarbageCollection() {
+        WideQueue<object> queue = new(4);
+        WeakReference weak = EnqueueAndDequeueReference(queue);
+
+        ForceGc();
+
+        Assert.IsFalse(weak.IsAlive);
+    }
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    private static WeakReference EnqueueAndDequeueReference(WideQueue<object> queue) {
+        object payload = new();
+        WeakReference weak = new(payload);
+        queue.Enqueue(payload);
+        queue.Dequeue();
+        return weak;
+    }
+
+    private static void ForceGc() {
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+    }
 }

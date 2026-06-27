@@ -21,8 +21,7 @@ public class WideBitArray : IWideCollection, ICloneable, ISerializable {
     }
 
     public WideBitArray(long bitCapacity) {
-        if (bitCapacity < 0)
-            throw new ArgumentOutOfRangeException(nameof(bitCapacity), "Capacity cannot be negative.");
+        ArgumentOutOfRangeException.ThrowIfNegative(bitCapacity);
 
         long longsNeeded = (bitCapacity + BitsPerLong - 1) / BitsPerLong;
         _data = new WideArray<ulong>(longsNeeded);
@@ -93,8 +92,7 @@ public class WideBitArray : IWideCollection, ICloneable, ISerializable {
     /// Resizes the bit array to the specified bit length.
     /// </summary>
     public void Resize(long newBitLength) {
-        if (newBitLength < 0)
-            throw new ArgumentOutOfRangeException(nameof(newBitLength), "Length cannot be negative.");
+        ArgumentOutOfRangeException.ThrowIfNegative(newBitLength);
 
         if (newBitLength == _bitLength)
             return;

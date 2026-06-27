@@ -103,4 +103,29 @@ public sealed class WidePriorityQueueTests {
         Assert.AreEqual(queue.Count, queue.Capacity);
         CollectionAssert.AreEqual(new[] { 17, 18, 19 }, new[] { queue.Dequeue(), queue.Dequeue(), queue.Dequeue() });
     }
+
+    [TestMethod]
+    public void Dequeue_ClearsRemovedReferenceForGarbageCollection() {
+        WidePriorityQueue<object, int> queue = new(4);
+        WeakReference weak = EnqueueAndDequeueReference(queue);
+
+        ForceGc();
+
+        Assert.IsFalse(weak.IsAlive);
+    }
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    private static WeakReference EnqueueAndDequeueReference(WidePriorityQueue<object, int> queue) {
+        object payload = new();
+        WeakReference weak = new(payload);
+        queue.Enqueue(payload, 1);
+        queue.Dequeue();
+        return weak;
+    }
+
+    private static void ForceGc() {
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+    }
 }

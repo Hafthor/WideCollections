@@ -50,14 +50,9 @@ public class WideSortedSet<T> : IWideSet<T>, IWideCollection, IWideReadOnlySet<T
     public void CopyTo(WideArray<T> array, long arrayIndex) {
         ArgumentNullException.ThrowIfNull(array);
 
-        if (arrayIndex < 0)
-            throw new ArgumentOutOfRangeException(nameof(arrayIndex), "Index cannot be negative.");
-
-        if (arrayIndex > array.Length)
-            throw new ArgumentOutOfRangeException(nameof(arrayIndex), "Index exceeds destination length.");
-
-        if (array.Length - arrayIndex < Count)
-            throw new ArgumentException("Destination does not have enough space.", nameof(array));
+        ArgumentOutOfRangeException.ThrowIfNegative(arrayIndex);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(arrayIndex, array.Length);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(arrayIndex + Count, array.Length);
 
         for (long i = 0; i < Count; i++)
             array[arrayIndex + i] = _items[i];
@@ -135,8 +130,9 @@ public class WideSortedSet<T> : IWideSet<T>, IWideCollection, IWideReadOnlySet<T
 
     public void CopyTo(T[] array, int index, int count) {
         ArgumentNullException.ThrowIfNull(array);
-        if (index < 0 || count < 0 || index > array.Length - count)
-            throw new ArgumentOutOfRangeException(nameof(index), "Invalid index/count.");
+        ArgumentOutOfRangeException.ThrowIfNegative(index);
+        ArgumentOutOfRangeException.ThrowIfNegative(count);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(index, array.Length - count);
         if (count > Count)
             throw new ArgumentException("Destination does not have enough space.", nameof(array));
 

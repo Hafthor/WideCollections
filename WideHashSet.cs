@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Runtime.CompilerServices;
 
 namespace WideCollections;
 
@@ -20,6 +21,7 @@ public class WideHashSet<T> : IWideSet<T>, IWideReadOnlySet<T>, ICompactable {
     private long _freeList = -1;
     private long _freeCount;
     private long _version;
+    private static readonly bool ContainsReferences = RuntimeHelpers.IsReferenceOrContainsReferences<T>();
 
     private struct Entry {
         public int HashCode;
@@ -34,8 +36,7 @@ public class WideHashSet<T> : IWideSet<T>, IWideReadOnlySet<T>, ICompactable {
     public WideHashSet(long capacity) : this(capacity, null) { }
 
     public WideHashSet(long capacity, IEqualityComparer<T> comparer) {
-        if (capacity < 0)
-            throw new ArgumentOutOfRangeException(nameof(capacity), "Capacity cannot be negative.");
+        ArgumentOutOfRangeException.ThrowIfNegative(capacity);
 
         _comparer = comparer ?? EqualityComparer<T>.Default;
         if (capacity > 0)
@@ -67,10 +68,17 @@ public class WideHashSet<T> : IWideSet<T>, IWideReadOnlySet<T>, ICompactable {
             return;
 
         _buckets.Clear();
-        if (!typeof(T).IsValueType) {
+        if (ContainsReferences) {
             for (long i = 0; i < _count; i++) {
                 Entry entry = _entries[i];
                 entry.Value = default!;
+                entry.HashCode = -1;
+                entry.Next = -1;
+                _entries[i] = entry;
+            }
+        } else {
+            for (long i = 0; i < _count; i++) {
+                Entry entry = _entries[i];
                 entry.HashCode = -1;
                 entry.Next = -1;
                 _entries[i] = entry;
@@ -102,14 +110,9 @@ public class WideHashSet<T> : IWideSet<T>, IWideReadOnlySet<T>, ICompactable {
     public void CopyTo(WideArray<T> array, long arrayIndex) {
         ArgumentNullException.ThrowIfNull(array);
 
-        if (arrayIndex < 0)
-            throw new ArgumentOutOfRangeException(nameof(arrayIndex), "Index cannot be negative.");
-
-        if (arrayIndex > array.Length)
-            throw new ArgumentOutOfRangeException(nameof(arrayIndex), "Index exceeds destination length.");
-
-        if (array.Length - arrayIndex < Count)
-            throw new ArgumentException("Destination does not have enough space.", nameof(array));
+        ArgumentOutOfRangeException.ThrowIfNegative(arrayIndex);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(arrayIndex, array.Length);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(Count, array.Length - arrayIndex);
 
         long copied = 0;
         for (long i = 0; i < _count; i++) {

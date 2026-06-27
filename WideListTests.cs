@@ -43,6 +43,20 @@ public sealed class WideListTests {
     }
 
     [TestMethod]
+    public void BinarySearch_WithCustomComparer_AndNullComparerBehavior() {
+        WideList<int> descending = new();
+        descending.Add(9);
+        descending.Add(7);
+        descending.Add(5);
+        descending.Add(3);
+        IComparer<int> comparer = Comparer<int>.Create((x, y) => y.CompareTo(x));
+
+        Assert.AreEqual(2L, descending.BinarySearch(5, comparer));
+        Assert.AreEqual(~2L, descending.BinarySearch(6, comparer));
+        Assert.Throws<ArgumentNullException>(() => descending.BinarySearch(5, null!));
+    }
+
+    [TestMethod]
     public void Enumerator_OnlyReturnsCountItems() {
         WideList<int> list = new(10);
         list.Add(10);
@@ -69,6 +83,61 @@ public sealed class WideListTests {
     }
 
     [TestMethod]
+    public void GetSetAndIndexer_WorkAsExpected() {
+        WideList<string> list = new();
+        list.Add("a");
+        list.Add("b");
+
+        Assert.AreEqual("a", list.Get(0));
+        list.Set(1, "B");
+        Assert.AreEqual("B", list[1]);
+
+        list[0] = "A";
+        Assert.AreEqual("A", list.Get(0));
+    }
+
+    [TestMethod]
+    public void ExplicitIWideListIndexer_WorksForGetAndSet() {
+        IWideList list = new WideList<int>();
+        list.Add(1);
+        list.Add(2);
+
+        Assert.AreEqual(1, list[0]);
+        list[1] = 20;
+        Assert.AreEqual(20, list[1]);
+    }
+
+    [TestMethod]
+    public void ConstructorAndRangeChecks_ThrowForInvalidArguments() {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new WideList<int>(-1));
+
+        WideList<int> list = new();
+        list.Add(1);
+        list.Add(2);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => list.Insert(-1, 0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => list.Insert(3, 0));
+        Assert.Throws<IndexOutOfRangeException>(() => list.RemoveAt(2));
+        Assert.Throws<IndexOutOfRangeException>(() => list.Get(-1));
+        Assert.Throws<IndexOutOfRangeException>(() => list.Set(2, 3));
+    }
+
+    [TestMethod]
+    public void CapacitySetterAndCopyTo_ValidateArguments() {
+        WideList<int> list = new(2);
+        list.Add(1);
+        list.Add(2);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => list.Capacity = 1);
+        list.Capacity = 10;
+        Assert.AreEqual(10L, list.Capacity);
+
+        WideArray<int> destination = new(2);
+        Assert.Throws<ArgumentOutOfRangeException>(() => list.CopyTo(destination, -1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => list.CopyTo(destination, 1));
+    }
+
+    [TestMethod]
     public void NonGenericAdd_ReturnsInsertedIndex() {
         IWideList list = new WideList<int>();
 
@@ -88,6 +157,27 @@ public sealed class WideListTests {
     }
 
     [TestMethod]
+    public void ObjectContains_UsesGenericContainsSemantics() {
+        WideList<int> list = new();
+        list.Add(10);
+        Assert.IsTrue(list.Contains((object)10));
+        Assert.IsFalse(list.Contains((object)99));
+    }
+
+    [TestMethod]
+    public void Clear_ResetsCountAndRemovesItems() {
+        WideList<string> list = new();
+        list.Add("x");
+        list.Add("y");
+        list.Clear();
+
+        Assert.AreEqual(0L, list.Count);
+        Assert.IsFalse(list.Contains("x"));
+        list.Add("z");
+        CollectionAssert.AreEqual(new[] { "z" }, list.ToArray());
+    }
+
+    [TestMethod]
     public void Compact_AfterRemovingMostItems_ShrinksCapacityToCount() {
         WideList<int> list = new(64);
         for (int i = 0; i < 20; i++)
@@ -101,5 +191,30 @@ public sealed class WideListTests {
 
         Assert.AreEqual(list.Count, list.Capacity);
         CollectionAssert.AreEqual(new[] { 0, 1, 2 }, list.ToArray());
+    }
+
+    [TestMethod]
+    public void RemoveAt_ClearsRemovedReferenceForGarbageCollection() {
+        WideList<object> list = new(4);
+        WeakReference weak = AddAndRemoveReference(list);
+
+        ForceGc();
+
+        Assert.IsFalse(weak.IsAlive);
+    }
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    private static WeakReference AddAndRemoveReference(WideList<object> list) {
+        object payload = new();
+        WeakReference weak = new(payload);
+        list.Add(payload);
+        list.RemoveAt(0);
+        return weak;
+    }
+
+    private static void ForceGc() {
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
     }
 }

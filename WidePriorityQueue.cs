@@ -1,9 +1,13 @@
+using System.Runtime.CompilerServices;
+
 namespace WideCollections;
 
 public class WidePriorityQueue<TElement, TPriority> : ICompactable {
     private WideArray<(TElement Element, TPriority Priority)> _nodes;
     private long _size;
     private readonly IComparer<TPriority> _comparer;
+    private static readonly bool ContainsReferences =
+        RuntimeHelpers.IsReferenceOrContainsReferences<(TElement Element, TPriority Priority)>();
 
     public WidePriorityQueue() : this(0, null) { }
 
@@ -12,8 +16,7 @@ public class WidePriorityQueue<TElement, TPriority> : ICompactable {
     public WidePriorityQueue(long initialCapacity) : this(initialCapacity, null) { }
 
     public WidePriorityQueue(long initialCapacity, IComparer<TPriority> comparer) {
-        if (initialCapacity < 0)
-            throw new ArgumentOutOfRangeException(nameof(initialCapacity), "Capacity cannot be negative.");
+        ArgumentOutOfRangeException.ThrowIfNegative(initialCapacity);
 
         _nodes = new WideArray<(TElement Element, TPriority Priority)>(initialCapacity);
         _comparer = comparer ?? Comparer<TPriority>.Default;
@@ -124,8 +127,7 @@ public class WidePriorityQueue<TElement, TPriority> : ICompactable {
     }
 
     public long EnsureCapacity(long capacity) {
-        if (capacity < 0)
-            throw new ArgumentOutOfRangeException(nameof(capacity), "Capacity cannot be negative.");
+        ArgumentOutOfRangeException.ThrowIfNegative(capacity);
 
         if (_nodes.Length < capacity)
             Grow(capacity);
@@ -142,7 +144,7 @@ public class WidePriorityQueue<TElement, TPriority> : ICompactable {
         if (_size == 0)
             return;
 
-        if (!typeof((TElement Element, TPriority Priority)).IsValueType) {
+        if (ContainsReferences) {
             for (long i = 0; i < _size; i++)
                 _nodes[i] = default!;
         }
@@ -158,6 +160,9 @@ public class WidePriorityQueue<TElement, TPriority> : ICompactable {
         _size = lastIndex;
         if (_size > 0)
             MoveDown(last, 0);
+
+        if (ContainsReferences)
+            _nodes[lastIndex] = default!;
     }
 
     private void MoveUp((TElement Element, TPriority Priority) node, long index) {

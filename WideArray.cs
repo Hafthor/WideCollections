@@ -31,15 +31,14 @@ public class WideArray<T> : IWideCollection<T>, IWideReadOnlyCollection<T> {
     /// Intended for tests to exercise segment-boundary behavior with small segment sizes.
     /// </summary>
     internal WideArray(long capacity, int segmentShift) {
-        if (segmentShift < 1 || segmentShift > 30)
-            throw new ArgumentOutOfRangeException(nameof(segmentShift), "Segment shift must be between 1 and 30.");
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(segmentShift);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(segmentShift, 30);
 
         _segmentShift = segmentShift;
         _segmentSize = 1 << _segmentShift;
         _segmentMask = _segmentSize - 1;
 
-        if (capacity < 0)
-            throw new ArgumentOutOfRangeException(nameof(capacity), "Capacity cannot be negative.");
+        ArgumentOutOfRangeException.ThrowIfNegative(capacity);
 
         if (capacity == 0)
             return;
@@ -89,8 +88,7 @@ public class WideArray<T> : IWideCollection<T>, IWideReadOnlyCollection<T> {
     /// Extends the array to the specified length, initializing new elements to default(T).
     /// </summary>
     public void Resize(long newLength) {
-        if (newLength < 0)
-            throw new ArgumentOutOfRangeException(nameof(newLength), "Length cannot be negative.");
+        ArgumentOutOfRangeException.ThrowIfNegative(newLength);
 
         if (newLength == _length)
             return;
@@ -175,15 +173,9 @@ public class WideArray<T> : IWideCollection<T>, IWideReadOnlyCollection<T> {
     
     public void CopyTo(WideArray<T> array, long arrayIndex) {
         ArgumentNullException.ThrowIfNull(array);
-
-        if (arrayIndex < 0)
-            throw new ArgumentOutOfRangeException(nameof(arrayIndex), "Index cannot be negative.");
-
-        if (arrayIndex > array.Length)
-            throw new ArgumentOutOfRangeException(nameof(arrayIndex), "Index exceeds destination length.");
-
-        if (array.Length - arrayIndex < _length)
-            throw new ArgumentException("Destination does not have enough space.", nameof(array));
+        ArgumentOutOfRangeException.ThrowIfNegative(arrayIndex);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(arrayIndex, array.Length);
+        ArgumentOutOfRangeException.ThrowIfLessThan(array.Length - arrayIndex, _length);
 
         for (long i = 0; i < _length; i++)
             array[arrayIndex + i] = this[i];

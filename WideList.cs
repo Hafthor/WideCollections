@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Runtime.CompilerServices;
 
 namespace WideCollections;
 
@@ -8,6 +9,7 @@ namespace WideCollections;
 public class WideList<T> : IWideList<T>, IWideList, IWideReadOnlyList<T>, ICompactable {
     private WideArray<T> _items;
     private long _count = 0;
+    private static readonly bool ContainsReferences = RuntimeHelpers.IsReferenceOrContainsReferences<T>();
 
     public long Count => _count;
     public object SyncRoot { get; }
@@ -27,8 +29,7 @@ public class WideList<T> : IWideList<T>, IWideList, IWideReadOnlyList<T>, ICompa
     public long Capacity {
         get => _items.Length;
         set {
-            if (value < _count)
-                throw new ArgumentOutOfRangeException(nameof(value), "Capacity cannot be less than Count.");
+            ArgumentOutOfRangeException.ThrowIfLessThan(value, _count);
 
             if (value != _items.Length)
                 _items.Resize(value);
@@ -41,8 +42,7 @@ public class WideList<T> : IWideList<T>, IWideList, IWideReadOnlyList<T>, ICompa
     }
 
     public WideList(long capacity) {
-        if (capacity < 0)
-            throw new ArgumentOutOfRangeException(nameof(capacity), "Capacity cannot be negative.");
+        ArgumentOutOfRangeException.ThrowIfNegative(capacity);
 
         _items = new WideArray<T>(capacity);
         SyncRoot = new object();
@@ -76,8 +76,8 @@ public class WideList<T> : IWideList<T>, IWideList, IWideReadOnlyList<T>, ICompa
     }
 
     public void Insert(long index, T item) {
-        if (index < 0 || index > _count)
-            throw new ArgumentOutOfRangeException(nameof(index), "Index is out of range.");
+        ArgumentOutOfRangeException.ThrowIfNegative(index);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(index, _count);
 
         if (_count >= _items.Length)
             EnsureCapacity(_count + 1);
@@ -99,19 +99,16 @@ public class WideList<T> : IWideList<T>, IWideList, IWideReadOnlyList<T>, ICompa
             _items[i] = _items[i + 1];
 
         _count--;
+        if (ContainsReferences)
+            _items[_count] = default!;
     }
 
     public void CopyTo(WideArray<T> array, long arrayIndex) {
         ArgumentNullException.ThrowIfNull(array);
 
-        if (arrayIndex < 0)
-            throw new ArgumentOutOfRangeException(nameof(arrayIndex), "Index cannot be negative.");
-
-        if (arrayIndex > array.Length)
-            throw new ArgumentOutOfRangeException(nameof(arrayIndex), "Index exceeds destination length.");
-
-        if (array.Length - arrayIndex < _count)
-            throw new ArgumentException("Destination does not have enough space.", nameof(array));
+        ArgumentOutOfRangeException.ThrowIfNegative(arrayIndex);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(arrayIndex, array.Length);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(arrayIndex, array.Length - _count);
 
         for (long i = 0; i < _count; i++)
             array[arrayIndex + i] = _items[i];
@@ -153,7 +150,7 @@ public class WideList<T> : IWideList<T>, IWideList, IWideReadOnlyList<T>, ICompa
     public void Clear() {
         if (_count > 0) {
             // Clear references for reference types
-            if (!typeof(T).IsValueType)
+            if (ContainsReferences)
                 for (long i = 0; i < _count; i++)
                     _items[i] = default!;
 
@@ -208,8 +205,7 @@ public class WideList<T> : IWideList<T>, IWideList, IWideReadOnlyList<T>, ICompa
     /// The negative value is the bitwise complement of the index where the item should be inserted.
     /// </summary>
     public long BinarySearch(T item, IComparer<T> comparer) {
-        if (comparer == null)
-            throw new ArgumentNullException(nameof(comparer));
+        ArgumentNullException.ThrowIfNull(comparer);
 
         long left = 0;
         long right = _count - 1;

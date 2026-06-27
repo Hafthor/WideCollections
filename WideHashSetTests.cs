@@ -2,6 +2,11 @@ namespace WideCollections;
 
 [TestClass]
 public sealed class WideHashSetTests {
+    private readonly struct RefHolder {
+        public RefHolder(object value) => Value = value;
+        public object Value { get; }
+    }
+
     [TestMethod]
     public void Add_DeduplicatesValues() {
         WideHashSet<int> set = new();
@@ -112,5 +117,30 @@ public sealed class WideHashSetTests {
 
         Assert.IsTrue(after < before);
         CollectionAssert.AreEquivalent(new[] { 25, 26, 27, 28, 29 }, set.OrderBy(x => x).ToArray());
+    }
+
+    [TestMethod]
+    public void Clear_ClearsStructContainedReferencesForGarbageCollection() {
+        WideHashSet<RefHolder> set = new();
+        WeakReference weak = AddStructReferenceAndClear(set);
+
+        ForceGc();
+
+        Assert.IsFalse(weak.IsAlive);
+    }
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    private static WeakReference AddStructReferenceAndClear(WideHashSet<RefHolder> set) {
+        object payload = new();
+        WeakReference weak = new(payload);
+        set.Add(new RefHolder(payload));
+        set.Clear();
+        return weak;
+    }
+
+    private static void ForceGc() {
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
     }
 }

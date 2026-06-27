@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Runtime.CompilerServices;
 
 namespace WideCollections;
 
@@ -10,6 +11,7 @@ public class WideQueue<T> : IEnumerable<T>,
     private long _head;
     private long _tail;
     private long _count;
+    private static readonly bool ContainsReferences = RuntimeHelpers.IsReferenceOrContainsReferences<T>();
 
     public WideQueue() {
         _items = new WideArray<T>();
@@ -17,8 +19,7 @@ public class WideQueue<T> : IEnumerable<T>,
     }
 
     public WideQueue(long capacity) {
-        if (capacity < 0)
-            throw new ArgumentOutOfRangeException(nameof(capacity), "Capacity cannot be negative.");
+        ArgumentOutOfRangeException.ThrowIfNegative(capacity);
 
         _items = new WideArray<T>(capacity);
         SyncRoot = new object();
@@ -38,8 +39,7 @@ public class WideQueue<T> : IEnumerable<T>,
     public long Capacity {
         get => _items.Length;
         set {
-            if (value < _count)
-                throw new ArgumentOutOfRangeException(nameof(value), "Capacity cannot be less than Count.");
+            ArgumentOutOfRangeException.ThrowIfLessThan(value, _count);
 
             if (value != _items.Length)
                 SetCapacity(value);
@@ -64,7 +64,7 @@ public class WideQueue<T> : IEnumerable<T>,
 
         T item = _items[_head];
 
-        if (!typeof(T).IsValueType)
+        if (ContainsReferences)
             _items[_head] = default!;
 
         _head++;
@@ -111,7 +111,7 @@ public class WideQueue<T> : IEnumerable<T>,
         if (_count == 0)
             return;
 
-        if (!typeof(T).IsValueType) {
+        if (ContainsReferences) {
             for (long i = 0; i < _count; i++)
                 _items[GetIndex(i)] = default!;
         }
@@ -136,14 +136,9 @@ public class WideQueue<T> : IEnumerable<T>,
     public void CopyTo(WideArray<T> array, long arrayIndex) {
         ArgumentNullException.ThrowIfNull(array);
 
-        if (arrayIndex < 0)
-            throw new ArgumentOutOfRangeException(nameof(arrayIndex), "Index cannot be negative.");
-
-        if (arrayIndex > array.Length)
-            throw new ArgumentOutOfRangeException(nameof(arrayIndex), "Index exceeds destination length.");
-
-        if (array.Length - arrayIndex < _count)
-            throw new ArgumentException("Destination does not have enough space.", nameof(array));
+        ArgumentOutOfRangeException.ThrowIfNegative(arrayIndex);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(arrayIndex, array.Length);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(_count, array.Length - arrayIndex);
 
         for (long i = 0; i < _count; i++)
             array[arrayIndex + i] = _items[GetIndex(i)];

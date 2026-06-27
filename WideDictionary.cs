@@ -38,8 +38,7 @@ public class WideDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
     public WideDictionary(IEqualityComparer<TKey> comparer) : this(0, comparer) { }
 
     public WideDictionary(long capacity, IEqualityComparer<TKey> comparer) {
-        if (capacity < 0)
-            throw new ArgumentOutOfRangeException(nameof(capacity), "Capacity cannot be negative.");
+        ArgumentOutOfRangeException.ThrowIfNegative(capacity);
 
         _comparer = comparer ?? EqualityComparer<TKey>.Default;
         SyncRoot = new object();
@@ -182,8 +181,7 @@ public class WideDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
     }
 
     void IWideDictionary.Remove(object key) {
-        if (key is null)
-            throw new ArgumentNullException(nameof(key));
+        ArgumentNullException.ThrowIfNull(key);
 
         if (key is TKey typedKey)
             Remove(typedKey);
@@ -212,14 +210,9 @@ public class WideDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
     public void CopyTo(WideArray<KeyValuePair<TKey, TValue>> array, long arrayIndex) {
         ArgumentNullException.ThrowIfNull(array);
 
-        if (arrayIndex < 0)
-            throw new ArgumentOutOfRangeException(nameof(arrayIndex), "Index cannot be negative.");
-
-        if (arrayIndex > array.Length)
-            throw new ArgumentOutOfRangeException(nameof(arrayIndex), "Index exceeds destination length.");
-
-        if (array.Length - arrayIndex < Count)
-            throw new ArgumentException("Destination does not have enough space.", nameof(array));
+        ArgumentOutOfRangeException.ThrowIfNegative(arrayIndex);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(arrayIndex, array.Length);
+        ArgumentOutOfRangeException.ThrowIfLessThan(array.Length - arrayIndex, Count);
 
         long copied = 0;
         for (long i = 0; i < _count; i++) {
@@ -370,16 +363,15 @@ public class WideDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
     private int InternalGetHashCode(TKey key) => _comparer.GetHashCode(key) & (int)Lower31BitMask;
 
     private static void ValidateObjectValue(object value) {
-        if (value is null && default(TValue) is not null)
-            throw new ArgumentNullException(nameof(value));
+        if (default(TValue) is not null)
+            ArgumentNullException.ThrowIfNull(value);
 
         if (value is not TValue && (value is not null || default(TValue) is not null))
             throw new ArgumentException($"Value must be of type {typeof(TValue)}.", nameof(value));
     }
 
     private static void ValidateObjectKey(object key) {
-        if (key is null)
-            throw new ArgumentNullException(nameof(key));
+        ArgumentNullException.ThrowIfNull(key);
 
         if (key is not TKey)
             throw new ArgumentException($"Key must be of type {typeof(TKey)}.", nameof(key));
@@ -527,12 +519,9 @@ public class WideDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
         public bool Contains(TKey item) => _dictionary.ContainsKey(item);
         public void CopyTo(WideArray<TKey> array, long arrayIndex) {
             ArgumentNullException.ThrowIfNull(array);
-            if (arrayIndex < 0)
-                throw new ArgumentOutOfRangeException(nameof(arrayIndex), "Index cannot be negative.");
-            if (arrayIndex > array.Length)
-                throw new ArgumentOutOfRangeException(nameof(arrayIndex), "Index exceeds destination length.");
-            if (array.Length - arrayIndex < _dictionary.Count)
-                throw new ArgumentException("Destination does not have enough space.", nameof(array));
+            ArgumentOutOfRangeException.ThrowIfNegative(arrayIndex);
+            ArgumentOutOfRangeException.ThrowIfGreaterThan(arrayIndex, array.Length);
+            ArgumentOutOfRangeException.ThrowIfLessThan(array.Length - arrayIndex, _dictionary.Count);
 
             long copied = 0;
             for (long i = 0; i < _dictionary._count; i++) {
@@ -582,12 +571,9 @@ public class WideDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
 
         public void CopyTo(WideArray<TValue> array, long arrayIndex) {
             ArgumentNullException.ThrowIfNull(array);
-            if (arrayIndex < 0)
-                throw new ArgumentOutOfRangeException(nameof(arrayIndex), "Index cannot be negative.");
-            if (arrayIndex > array.Length)
-                throw new ArgumentOutOfRangeException(nameof(arrayIndex), "Index exceeds destination length.");
-            if (array.Length - arrayIndex < _dictionary.Count)
-                throw new ArgumentException("Destination does not have enough space.", nameof(array));
+            ArgumentOutOfRangeException.ThrowIfNegative(arrayIndex);
+            ArgumentOutOfRangeException.ThrowIfGreaterThan(arrayIndex, array.Length);
+            ArgumentOutOfRangeException.ThrowIfLessThan(array.Length - arrayIndex, _dictionary.Count);
 
             long copied = 0;
             for (long i = 0; i < _dictionary._count; i++) {

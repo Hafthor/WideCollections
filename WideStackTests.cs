@@ -90,4 +90,29 @@ public sealed class WideStackTests {
         Assert.AreEqual(stack.Count, stack.Capacity);
         Assert.AreEqual(2, stack.Peek());
     }
+
+    [TestMethod]
+    public void Pop_ClearsRemovedReferenceForGarbageCollection() {
+        WideStack<object> stack = new(4);
+        WeakReference weak = PushAndPopReference(stack);
+
+        ForceGc();
+
+        Assert.IsFalse(weak.IsAlive);
+    }
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    private static WeakReference PushAndPopReference(WideStack<object> stack) {
+        object payload = new();
+        WeakReference weak = new(payload);
+        stack.Push(payload);
+        stack.Pop();
+        return weak;
+    }
+
+    private static void ForceGc() {
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+    }
 }
