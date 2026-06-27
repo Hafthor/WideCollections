@@ -62,4 +62,21 @@ public sealed class WideSortedDictionaryTests {
         CollectionAssert.AreEqual(new[] { "A", "b" }, dictionary.Keys.ToArray());
         Assert.IsTrue(dictionary.ContainsKey("a"));
     }
+
+    [TestMethod]
+    public void Compact_AfterRemovingMostItems_ShrinksBackingStorage() {
+        WideSortedDictionary<int, int> dictionary = new();
+        for (int i = 0; i < 30; i++)
+            dictionary.Add(i, i);
+
+        for (int i = 0; i < 25; i++)
+            dictionary.Remove(i);
+
+        long before = dictionary.InternalItemsCapacity;
+        dictionary.Compact();
+        long after = dictionary.InternalItemsCapacity;
+
+        Assert.IsTrue(after < before);
+        CollectionAssert.AreEqual(new[] { 25, 26, 27, 28, 29 }, dictionary.Keys.ToArray());
+    }
 }

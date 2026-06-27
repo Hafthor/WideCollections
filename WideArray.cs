@@ -8,35 +8,50 @@ namespace WideCollections;
 /// Uses 2^30 sized segments with bitwise operations for fast indexing.
 /// </summary>
 public class WideArray<T> : IWideCollection<T>, IWideReadOnlyCollection<T> {
-    private const int SegmentSize = 1 << 30; // 2^30 = 1,073,741,824 elements per segment
-    private const int SegmentMask = (1 << 30) - 1; // 0x3FFFFFFF for bitwise offset: index & SegmentMask
-    private const int SegmentShift = 30; // For bitwise segment index: index >> 30
+    private const int DefaultSegmentShift = 30; // 2^30 = 1,073,741,824 elements per segment
 
     private T[][] _segments = [];
     private long _length = 0;
+    private readonly int _segmentShift;
+    private readonly int _segmentSize;
+    private readonly int _segmentMask;
 
     public long Length => _length;
     public T[][] Segments => _segments;
 
-    public WideArray() { }
+    public WideArray() : this(0) { }
 
     /// <summary>
     /// Initialize a WideArray with a specific capacity.
     /// </summary>
-    public WideArray(long capacity) {
+    public WideArray(long capacity) : this(capacity, DefaultSegmentShift) { }
+
+    /// <summary>
+    /// Initialize a WideArray with a specific capacity and segment shift.
+    /// Intended for tests to exercise segment-boundary behavior with small segment sizes.
+    /// </summary>
+    internal WideArray(long capacity, int segmentShift) {
+        if (segmentShift < 1 || segmentShift > 30)
+            throw new ArgumentOutOfRangeException(nameof(segmentShift), "Segment shift must be between 1 and 30.");
+
+        _segmentShift = segmentShift;
+        _segmentSize = 1 << _segmentShift;
+        _segmentMask = _segmentSize - 1;
+
         if (capacity < 0)
             throw new ArgumentOutOfRangeException(nameof(capacity), "Capacity cannot be negative.");
 
         if (capacity == 0)
             return;
 
-        long segmentsNeeded = (capacity + SegmentSize - 1) >> SegmentShift;
+        long segmentsNeeded = (capacity + _segmentSize - 1) >> _segmentShift;
         _segments = new T[segmentsNeeded][];
 
         for (long i = 0; i < segmentsNeeded; i++) {
-            int currentSegmentSize = (int)((capacity - (i << SegmentShift)) > SegmentSize
-                ? SegmentSize
-                : capacity - (i << SegmentShift));
+            long segmentStart = i << _segmentShift;
+            int currentSegmentSize = (int)((capacity - segmentStart) > _segmentSize
+                ? _segmentSize
+                : capacity - segmentStart);
             _segments[i] = new T[currentSegmentSize];
         }
 
@@ -82,31 +97,32 @@ public class WideArray<T> : IWideCollection<T>, IWideReadOnlyCollection<T> {
 
         if (newLength < _length) {
             // Shrinking - trim segments
-            long segmentsNeeded = newLength == 0 ? 0 : (newLength + SegmentSize - 1) >> SegmentShift;
+            long segmentsNeeded = newLength == 0 ? 0 : (newLength + _segmentSize - 1) >> _segmentShift;
             System.Array.Resize(ref _segments, (int)segmentsNeeded);
 
             if (segmentsNeeded > 0) {
-                int lastSegmentSize = (int)(newLength - ((segmentsNeeded - 1) << SegmentShift));
+                int lastSegmentSize = (int)(newLength - ((segmentsNeeded - 1) << _segmentShift));
                 System.Array.Resize(ref _segments[segmentsNeeded - 1], lastSegmentSize);
             }
         } else {
             // Growing - add new segments or expand existing ones
             long currentSegments = _segments.Length;
-            long segmentsNeeded = (newLength + SegmentSize - 1) >> SegmentShift;
+            long segmentsNeeded = (newLength + _segmentSize - 1) >> _segmentShift;
 
             if (segmentsNeeded > currentSegments) {
                 System.Array.Resize(ref _segments, (int)segmentsNeeded);
 
                 for (long i = currentSegments; i < segmentsNeeded; i++) {
-                    int currentSegmentSize = (int)((newLength - (i << SegmentShift)) > SegmentSize
-                        ? SegmentSize
-                        : newLength - (i << SegmentShift));
+                    long segmentStart = i << _segmentShift;
+                    int currentSegmentSize = (int)((newLength - segmentStart) > _segmentSize
+                        ? _segmentSize
+                        : newLength - segmentStart);
                     _segments[i] = new T[currentSegmentSize];
                 }
             } else if (segmentsNeeded == currentSegments && currentSegments > 0) {
                 // Expand the last segment if it's not already at full size
                 int lastSegmentIndex = (int)(segmentsNeeded - 1);
-                int newLastSegmentSize = (int)(newLength - (lastSegmentIndex << SegmentShift));
+                int newLastSegmentSize = (int)(newLength - (lastSegmentIndex << _segmentShift));
                 if (_segments[lastSegmentIndex].Length < newLastSegmentSize) {
                     Array.Resize(ref _segments[lastSegmentIndex], newLastSegmentSize);
                 }
@@ -122,8 +138,8 @@ public class WideArray<T> : IWideCollection<T>, IWideReadOnlyCollection<T> {
     }
 
     private void GetSegmentAndOffset(long index, out int segmentIndex, out int offset) {
-        segmentIndex = (int)(index >> SegmentShift);
-        offset = (int)(index & SegmentMask);
+        segmentIndex = (int)(index >> _segmentShift);
+        offset = (int)(index & _segmentMask);
     }
 
     /// <summary>

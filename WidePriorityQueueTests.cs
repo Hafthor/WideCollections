@@ -87,4 +87,20 @@ public sealed class WidePriorityQueueTests {
 
         Assert.AreEqual(2L, queue.Capacity);
     }
+
+    [TestMethod]
+    public void Compact_AfterRemovingMostItems_ShrinksCapacityToCount() {
+        WidePriorityQueue<int, int> queue = new(64);
+        for (int i = 0; i < 20; i++)
+            queue.Enqueue(i, i);
+
+        for (int i = 0; i < 17; i++)
+            queue.Dequeue();
+
+        Assert.IsTrue(queue.Capacity > queue.Count);
+        queue.Compact();
+
+        Assert.AreEqual(queue.Count, queue.Capacity);
+        CollectionAssert.AreEqual(new[] { 17, 18, 19 }, new[] { queue.Dequeue(), queue.Dequeue(), queue.Dequeue() });
+    }
 }

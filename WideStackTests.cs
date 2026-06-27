@@ -74,4 +74,20 @@ public sealed class WideStackTests {
         Assert.IsFalse(stack.Contains("b"));
         Assert.Throws<InvalidOperationException>(() => stack.Peek());
     }
+
+    [TestMethod]
+    public void Compact_AfterRemovingMostItems_ShrinksCapacityToCount() {
+        WideStack<int> stack = new(64);
+        for (int i = 0; i < 20; i++)
+            stack.Push(i);
+
+        for (int i = 0; i < 17; i++)
+            stack.Pop();
+
+        Assert.IsTrue(stack.Capacity > stack.Count);
+        stack.Compact();
+
+        Assert.AreEqual(stack.Count, stack.Capacity);
+        Assert.AreEqual(2, stack.Peek());
+    }
 }

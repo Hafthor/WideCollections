@@ -2,47 +2,50 @@ using System.Collections;
 
 namespace WideCollections;
 
-public class WideSortedSet<T> : IWideSet<T>, IWideCollection, IWideReadOnlySet<T> {
-    private readonly SortedSet<T> _set;
+public class WideSortedSet<T> : IWideSet<T>, IWideCollection, IWideReadOnlySet<T>, ICompactable {
+    private readonly WideList<T> _items;
+    private readonly IComparer<T> _comparer;
 
-    private WideSortedSet(SortedSet<T> set) {
-        _set = set;
-        SyncRoot = new object();
-    }
-
-    public WideSortedSet() {
-        _set = new SortedSet<T>();
-        SyncRoot = new object();
-    }
+    public WideSortedSet() : this((IComparer<T>)null) { }
 
     public WideSortedSet(IComparer<T> comparer) {
-        _set = comparer is null ? new SortedSet<T>() : new SortedSet<T>(comparer);
+        _items = new WideList<T>();
+        _comparer = comparer ?? Comparer<T>.Default;
         SyncRoot = new object();
     }
 
     public WideSortedSet(IEnumerable<T> collection) : this(collection, null) { }
 
-    public WideSortedSet(IEnumerable<T> collection, IComparer<T> comparer) {
+    public WideSortedSet(IEnumerable<T> collection, IComparer<T> comparer) : this(comparer) {
         ArgumentNullException.ThrowIfNull(collection);
-        _set = comparer is null ? new SortedSet<T>(collection) : new SortedSet<T>(collection, comparer);
-        SyncRoot = new object();
+        UnionWith(collection);
     }
 
-    public long Count => _set.Count;
+    public long Count => _items.Count;
     public bool IsReadOnly => false;
     public object SyncRoot { get; }
     public bool IsSynchronized => false;
-    public IComparer<T> Comparer => _set.Comparer;
-    public T Min => _set.Min;
-    public T Max => _set.Max;
+    public IComparer<T> Comparer => _comparer;
+    public T Min => Count == 0 ? default! : _items[0];
+    public T Max => Count == 0 ? default! : _items[Count - 1];
+    internal long InternalItemsCapacity => _items.Capacity;
 
-    public bool Add(T item) => _set.Add(item);
+    public bool Add(T item) {
+        long index = FindIndex(item);
+        if (index >= 0)
+            return false;
+
+        _items.Insert(~index, item);
+        return true;
+    }
 
     void IWideCollection<T>.Add(T item) => Add(item);
 
-    public void Clear() => _set.Clear();
+    public void Clear() => _items.Clear();
 
-    public bool Contains(T item) => _set.Contains(item);
+    public void Compact() => _items.Compact();
+
+    public bool Contains(T item) => FindIndex(item) >= 0;
 
     public void CopyTo(WideArray<T> array, long arrayIndex) {
         ArgumentNullException.ThrowIfNull(array);
@@ -56,83 +59,221 @@ public class WideSortedSet<T> : IWideSet<T>, IWideCollection, IWideReadOnlySet<T
         if (array.Length - arrayIndex < Count)
             throw new ArgumentException("Destination does not have enough space.", nameof(array));
 
-        long i = arrayIndex;
-        foreach (T item in _set) {
-            array[i] = item;
-            i++;
-        }
+        for (long i = 0; i < Count; i++)
+            array[arrayIndex + i] = _items[i];
     }
 
-    public bool Remove(T item) => _set.Remove(item);
+    public bool Remove(T item) {
+        long index = FindIndex(item);
+        if (index < 0)
+            return false;
+
+        _items.RemoveAt(index);
+        return true;
+    }
 
     public int RemoveWhere(Predicate<T> match) {
         ArgumentNullException.ThrowIfNull(match);
-        return _set.RemoveWhere(match);
+
+        int removed = 0;
+        for (long i = Count - 1; i >= 0; i--) {
+            if (match(_items[i])) {
+                _items.RemoveAt(i);
+                removed++;
+            }
+        }
+
+        return removed;
     }
 
-    public bool TryGetValue(T equalValue, out T actualValue) => _set.TryGetValue(equalValue, out actualValue);
+    public bool TryGetValue(T equalValue, out T actualValue) {
+        long index = FindIndex(equalValue);
+        if (index >= 0) {
+            actualValue = _items[index];
+            return true;
+        }
 
-    public WideSortedSet<T> GetViewBetween(T lowerValue, T upperValue) => new(_set.GetViewBetween(lowerValue, upperValue));
+        actualValue = default!;
+        return false;
+    }
 
-    public IEnumerable<T> Reverse() => _set.Reverse();
+    public WideSortedSet<T> GetViewBetween(T lowerValue, T upperValue) {
+        if (_comparer.Compare(lowerValue, upperValue) > 0)
+            throw new ArgumentException("Lower value must be less than or equal to upper value.");
 
-    public void CopyTo(T[] array) => _set.CopyTo(array);
+        WideSortedSet<T> view = new(_comparer);
+        for (long i = 0; i < Count; i++) {
+            T item = _items[i];
+            if (_comparer.Compare(item, lowerValue) < 0)
+                continue;
+            if (_comparer.Compare(item, upperValue) > 0)
+                break;
+            view.Add(item);
+        }
 
-    public void CopyTo(T[] array, int index) => _set.CopyTo(array, index);
+        return view;
+    }
 
-    public void CopyTo(T[] array, int index, int count) => _set.CopyTo(array, index, count);
+    public IEnumerable<T> Reverse() {
+        for (long i = Count - 1; i >= 0; i--)
+            yield return _items[i];
+    }
+
+    public void CopyTo(T[] array) {
+        if (Count > int.MaxValue)
+            throw new ArgumentException("Count exceeds array indexing range.", nameof(array));
+
+        CopyTo(array, 0, (int)Count);
+    }
+
+    public void CopyTo(T[] array, int index) {
+        if (Count > int.MaxValue)
+            throw new ArgumentException("Count exceeds array indexing range.", nameof(array));
+
+        CopyTo(array, index, (int)Count);
+    }
+
+    public void CopyTo(T[] array, int index, int count) {
+        ArgumentNullException.ThrowIfNull(array);
+        if (index < 0 || count < 0 || index > array.Length - count)
+            throw new ArgumentOutOfRangeException(nameof(index), "Invalid index/count.");
+        if (count > Count)
+            throw new ArgumentException("Destination does not have enough space.", nameof(array));
+
+        for (int i = 0; i < count; i++)
+            array[index + i] = _items[i];
+    }
 
     public void UnionWith(IEnumerable<T> other) {
         ArgumentNullException.ThrowIfNull(other);
-        _set.UnionWith(other);
+        foreach (T item in other)
+            Add(item);
     }
 
     public void IntersectWith(IEnumerable<T> other) {
         ArgumentNullException.ThrowIfNull(other);
-        _set.IntersectWith(other);
+
+        HashSet<T> otherSet = new(other, new ComparerEqualityAdapter<T>(_comparer));
+        for (long i = Count - 1; i >= 0; i--) {
+            if (!otherSet.Contains(_items[i]))
+                _items.RemoveAt(i);
+        }
     }
 
     public void ExceptWith(IEnumerable<T> other) {
         ArgumentNullException.ThrowIfNull(other);
-        _set.ExceptWith(other);
+        foreach (T item in other)
+            Remove(item);
     }
 
     public void SymmetricExceptWith(IEnumerable<T> other) {
         ArgumentNullException.ThrowIfNull(other);
-        _set.SymmetricExceptWith(other);
+
+        HashSet<T> unique = new(other, new ComparerEqualityAdapter<T>(_comparer));
+        foreach (T item in unique) {
+            if (!Remove(item))
+                Add(item);
+        }
     }
 
     public bool IsSubsetOf(IEnumerable<T> other) {
         ArgumentNullException.ThrowIfNull(other);
-        return _set.IsSubsetOf(other);
+        HashSet<T> set = new(other, new ComparerEqualityAdapter<T>(_comparer));
+        for (long i = 0; i < Count; i++) {
+            if (!set.Contains(_items[i]))
+                return false;
+        }
+
+        return true;
     }
 
     public bool IsSupersetOf(IEnumerable<T> other) {
         ArgumentNullException.ThrowIfNull(other);
-        return _set.IsSupersetOf(other);
+        foreach (T item in other) {
+            if (!Contains(item))
+                return false;
+        }
+
+        return true;
     }
 
     public bool IsProperSupersetOf(IEnumerable<T> other) {
         ArgumentNullException.ThrowIfNull(other);
-        return _set.IsProperSupersetOf(other);
+        HashSet<T> set = new(other, new ComparerEqualityAdapter<T>(_comparer));
+        if (Count <= set.Count)
+            return false;
+        foreach (T item in set) {
+            if (!Contains(item))
+                return false;
+        }
+
+        return true;
     }
 
     public bool IsProperSubsetOf(IEnumerable<T> other) {
         ArgumentNullException.ThrowIfNull(other);
-        return _set.IsProperSubsetOf(other);
+        HashSet<T> set = new(other, new ComparerEqualityAdapter<T>(_comparer));
+        if (Count >= set.Count)
+            return false;
+        for (long i = 0; i < Count; i++) {
+            if (!set.Contains(_items[i]))
+                return false;
+        }
+
+        return true;
     }
 
     public bool Overlaps(IEnumerable<T> other) {
         ArgumentNullException.ThrowIfNull(other);
-        return _set.Overlaps(other);
+        foreach (T item in other) {
+            if (Contains(item))
+                return true;
+        }
+
+        return false;
     }
 
     public bool SetEquals(IEnumerable<T> other) {
         ArgumentNullException.ThrowIfNull(other);
-        return _set.SetEquals(other);
+        HashSet<T> set = new(other, new ComparerEqualityAdapter<T>(_comparer));
+        if (set.Count != Count)
+            return false;
+        for (long i = 0; i < Count; i++) {
+            if (!set.Contains(_items[i]))
+                return false;
+        }
+
+        return true;
     }
 
-    public IEnumerator<T> GetEnumerator() => _set.GetEnumerator();
+    public IEnumerator<T> GetEnumerator() => _items.GetEnumerator();
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+
+    private long FindIndex(T item) {
+        long lo = 0;
+        long hi = Count - 1;
+        while (lo <= hi) {
+            long mid = lo + ((hi - lo) >> 1);
+            int cmp = _comparer.Compare(_items[mid], item);
+            if (cmp == 0)
+                return mid;
+            if (cmp < 0)
+                lo = mid + 1;
+            else
+                hi = mid - 1;
+        }
+
+        return ~lo;
+    }
+
+    private sealed class ComparerEqualityAdapter<TItem> : IEqualityComparer<TItem> {
+        private readonly IComparer<TItem> _cmp;
+
+        public ComparerEqualityAdapter(IComparer<TItem> cmp) => _cmp = cmp;
+
+        public bool Equals(TItem x, TItem y) => _cmp.Compare(x, y) == 0;
+
+        public int GetHashCode(TItem obj) => 0;
+    }
 }

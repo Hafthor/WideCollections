@@ -2,7 +2,7 @@ using System.Collections;
 
 namespace WideCollections;
 
-public class WideStack<T> : IEnumerable<T>, IWideCollection, IWideReadOnlyCollection<T> {
+public class WideStack<T> : IEnumerable<T>, IWideCollection, IWideReadOnlyCollection<T>, ICompactable {
     private WideArray<T> _items;
     private long _count;
 
@@ -133,6 +133,8 @@ public class WideStack<T> : IEnumerable<T>, IWideCollection, IWideReadOnlyCollec
         _count = topIndex;
         return true;
     }
+
+    public void Compact() => Capacity = _count;
 
     private void EnsureCapacity(long min) {
         long newCapacity = _items.Length == 0 ? 4 : _items.Length;

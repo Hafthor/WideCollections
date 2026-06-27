@@ -3,6 +3,7 @@ using System.Collections;
 namespace WideCollections;
 
 public class WideDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>, IWideDictionary, IWideReadOnlyDictionary<TKey, TValue>
+    , ICompactable
     where TKey : notnull {
     private const long Lower31BitMask = 0x7FFFFFFF;
     private static readonly long[] Primes = [
@@ -64,6 +65,7 @@ public class WideDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
     public bool IsFixedSize => false;
     public object SyncRoot { get; }
     public bool IsSynchronized => false;
+    internal long InternalEntriesLength => _entries.Length;
 
     public TValue this[TKey key] {
         get {
@@ -227,6 +229,43 @@ public class WideDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
                 copied++;
             }
         }
+    }
+
+    public void Compact() {
+        long liveCount = Count;
+        if (liveCount == 0) {
+            _buckets = new WideArray<long>();
+            _entries = new WideArray<Entry>();
+            _count = 0;
+            _freeList = -1;
+            _freeCount = 0;
+            _version++;
+            return;
+        }
+
+        long newSize = GetPrime(liveCount);
+        WideArray<long> newBuckets = new(newSize);
+        WideArray<Entry> newEntries = new(newSize);
+
+        long newIndex = 0;
+        for (long i = 0; i < _count; i++) {
+            Entry entry = _entries[i];
+            if (entry.HashCode < 0)
+                continue;
+
+            long bucket = entry.HashCode % newSize;
+            entry.Next = newBuckets[bucket] - 1;
+            newEntries[newIndex] = entry;
+            newBuckets[bucket] = newIndex + 1;
+            newIndex++;
+        }
+
+        _buckets = newBuckets;
+        _entries = newEntries;
+        _count = newIndex;
+        _freeCount = 0;
+        _freeList = -1;
+        _version++;
     }
 
     public Enumerator GetEnumerator() => new(this);

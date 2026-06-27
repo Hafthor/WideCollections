@@ -1,6 +1,6 @@
 namespace WideCollections;
 
-public class WidePriorityQueue<TElement, TPriority> {
+public class WidePriorityQueue<TElement, TPriority> : ICompactable {
     private WideArray<(TElement Element, TPriority Priority)> _nodes;
     private long _size;
     private readonly IComparer<TPriority> _comparer;
@@ -149,6 +149,8 @@ public class WidePriorityQueue<TElement, TPriority> {
 
         _size = 0;
     }
+
+    public void Compact() => TrimExcess();
 
     private void RemoveRoot() {
         long lastIndex = _size - 1;

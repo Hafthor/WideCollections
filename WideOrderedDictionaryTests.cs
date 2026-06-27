@@ -91,4 +91,20 @@ public sealed class WideOrderedDictionaryTests {
         dictionary.TrimExcess();
         Assert.AreEqual(dictionary.Count, dictionary.Capacity);
     }
+
+    [TestMethod]
+    public void Compact_AfterRemovingMostItems_ShrinksCapacityToCount() {
+        WideOrderedDictionary<int, int> dictionary = new(64);
+        for (int i = 0; i < 30; i++)
+            dictionary.Add(i, i);
+
+        for (int i = 0; i < 25; i++)
+            dictionary.Remove(i);
+
+        Assert.IsTrue(dictionary.Capacity > dictionary.Count);
+        dictionary.Compact();
+
+        Assert.AreEqual(dictionary.Count, dictionary.Capacity);
+        CollectionAssert.AreEqual(new[] { 25, 26, 27, 28, 29 }, dictionary.Keys.ToArray());
+    }
 }

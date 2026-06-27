@@ -10,10 +10,12 @@ public class WideOrderedDictionary<TKey, TValue> : IWideCollection<KeyValuePair<
     IWideReadOnlyList<KeyValuePair<TKey, TValue>>,
     IWideCollection,
     IWideDictionary,
-    IWideList
+    IWideList,
+    ICompactable
     where TKey : notnull {
-    private readonly List<KeyValuePair<TKey, TValue>> _items;
-    private readonly Dictionary<TKey, int> _indexByKey;
+    private readonly WideList<KeyValuePair<TKey, TValue>> _items;
+    private readonly WideDictionary<TKey, long> _indexByKey;
+    private readonly IEqualityComparer<TKey> _comparer;
     private KeyCollection _keys;
     private ValueCollection _values;
 
@@ -24,11 +26,12 @@ public class WideOrderedDictionary<TKey, TValue> : IWideCollection<KeyValuePair<
     public WideOrderedDictionary(IEqualityComparer<TKey> comparer) : this(0, comparer) { }
 
     public WideOrderedDictionary(long capacity, IEqualityComparer<TKey> comparer) {
-        if (capacity < 0 || capacity > int.MaxValue)
-            throw new ArgumentOutOfRangeException(nameof(capacity), "Capacity must be between 0 and Int32.MaxValue.");
+        if (capacity < 0)
+            throw new ArgumentOutOfRangeException(nameof(capacity), "Capacity cannot be negative.");
 
-        _items = new List<KeyValuePair<TKey, TValue>>((int)capacity);
-        _indexByKey = new Dictionary<TKey, int>((int)capacity, comparer ?? EqualityComparer<TKey>.Default);
+        _items = new WideList<KeyValuePair<TKey, TValue>>(capacity);
+        _comparer = comparer ?? EqualityComparer<TKey>.Default;
+        _indexByKey = new WideDictionary<TKey, long>(capacity, _comparer);
         SyncRoot = new object();
     }
 
@@ -45,14 +48,14 @@ public class WideOrderedDictionary<TKey, TValue> : IWideCollection<KeyValuePair<
     public bool IsFixedSize => false;
     public object SyncRoot { get; }
     public bool IsSynchronized => false;
-    public IEqualityComparer<TKey> Comparer => _indexByKey.Comparer;
+    public IEqualityComparer<TKey> Comparer => _comparer;
 
     public long Capacity {
         get => _items.Capacity;
         set {
-            if (value < Count || value > int.MaxValue)
-                throw new ArgumentOutOfRangeException(nameof(value), "Capacity cannot be less than Count and must fit in Int32.");
-            _items.Capacity = (int)value;
+            if (value < Count)
+                throw new ArgumentOutOfRangeException(nameof(value), "Capacity cannot be less than Count.");
+            _items.Capacity = value;
         }
     }
 
@@ -62,7 +65,7 @@ public class WideOrderedDictionary<TKey, TValue> : IWideCollection<KeyValuePair<
     }
 
     public KeyValuePair<TKey, TValue> this[long index] {
-        get => _items[ValidateIndex(index)];
+        get => _items[index];
         set => SetItemAtIndex(index, value);
     }
 
@@ -85,7 +88,6 @@ public class WideOrderedDictionary<TKey, TValue> : IWideCollection<KeyValuePair<
         set {
             if (value is not KeyValuePair<TKey, TValue> pair)
                 throw new ArgumentException($"Value must be of type {typeof(KeyValuePair<TKey, TValue>)}.", nameof(value));
-
             this[index] = pair;
         }
     }
@@ -102,7 +104,7 @@ public class WideOrderedDictionary<TKey, TValue> : IWideCollection<KeyValuePair<
         if (_indexByKey.ContainsKey(key))
             throw new ArgumentException("An item with the same key has already been added.", nameof(key));
 
-        int index = _items.Count;
+        long index = _items.Count;
         _items.Add(new KeyValuePair<TKey, TValue>(key, value));
         _indexByKey.Add(key, index);
     }
@@ -119,28 +121,28 @@ public class WideOrderedDictionary<TKey, TValue> : IWideCollection<KeyValuePair<
     public void Insert(long index, TKey key, TValue value) => Insert(index, new KeyValuePair<TKey, TValue>(key, value));
 
     public void Insert(long index, KeyValuePair<TKey, TValue> item) {
-        int insertIndex = ValidateInsertIndex(index);
+        if (index < 0 || index > Count)
+            throw new ArgumentOutOfRangeException(nameof(index), "Index is out of range.");
         if (_indexByKey.ContainsKey(item.Key))
             throw new ArgumentException("An item with the same key has already been added.", nameof(item));
 
-        _items.Insert(insertIndex, item);
-        ReindexFrom(insertIndex);
+        _items.Insert(index, item);
+        ReindexFrom(index);
     }
 
-    public KeyValuePair<TKey, TValue> GetAt(long index) => this[index];
+    public KeyValuePair<TKey, TValue> GetAt(long index) => _items[index];
 
     public void SetAt(long index, TValue value) {
-        int itemIndex = ValidateIndex(index);
-        KeyValuePair<TKey, TValue> existing = _items[itemIndex];
-        _items[itemIndex] = new KeyValuePair<TKey, TValue>(existing.Key, value);
+        KeyValuePair<TKey, TValue> pair = _items[index];
+        _items[index] = new KeyValuePair<TKey, TValue>(pair.Key, value);
     }
 
     public bool ContainsKey(TKey key) => key is not null && _indexByKey.ContainsKey(key);
 
     public bool ContainsValue(TValue value) {
         var comparer = EqualityComparer<TValue>.Default;
-        foreach (KeyValuePair<TKey, TValue> pair in _items) {
-            if (comparer.Equals(pair.Value, value))
+        for (long i = 0; i < _items.Count; i++) {
+            if (comparer.Equals(_items[i].Value, value))
                 return true;
         }
 
@@ -150,12 +152,11 @@ public class WideOrderedDictionary<TKey, TValue> : IWideCollection<KeyValuePair<
     public long IndexOf(TKey key) {
         if (key is null)
             return -1;
-
-        return _indexByKey.TryGetValue(key, out int index) ? index : -1;
+        return _indexByKey.TryGetValue(key, out long index) ? index : -1;
     }
 
     public bool TryGetValue(TKey key, out TValue value) {
-        if (key is not null && _indexByKey.TryGetValue(key, out int index)) {
+        if (key is not null && _indexByKey.TryGetValue(key, out long index)) {
             value = _items[index].Value;
             return true;
         }
@@ -165,7 +166,7 @@ public class WideOrderedDictionary<TKey, TValue> : IWideCollection<KeyValuePair<
     }
 
     public bool Remove(TKey key) {
-        if (key is null || !_indexByKey.TryGetValue(key, out int index))
+        if (key is null || !_indexByKey.TryGetValue(key, out long index))
             return false;
 
         RemoveAt(index);
@@ -175,42 +176,42 @@ public class WideOrderedDictionary<TKey, TValue> : IWideCollection<KeyValuePair<
     public bool Remove(TKey key, out TValue value) {
         if (TryGetValue(key, out value))
             return Remove(key);
-
         return false;
     }
 
     public void RemoveAt(long index) {
-        int itemIndex = ValidateIndex(index);
-        KeyValuePair<TKey, TValue> existing = _items[itemIndex];
-        _items.RemoveAt(itemIndex);
-        _indexByKey.Remove(existing.Key);
-        ReindexFrom(itemIndex);
+        KeyValuePair<TKey, TValue> pair = _items[index];
+        _items.RemoveAt(index);
+        _indexByKey.Remove(pair.Key);
+        ReindexFrom(index);
     }
 
     public bool Contains(KeyValuePair<TKey, TValue> item) {
-        if (!_indexByKey.TryGetValue(item.Key, out int index))
+        if (!_indexByKey.TryGetValue(item.Key, out long index))
             return false;
-
         return EqualityComparer<TValue>.Default.Equals(_items[index].Value, item.Value);
     }
 
     public bool Remove(KeyValuePair<TKey, TValue> item) {
         if (!Contains(item))
             return false;
-
         return Remove(item.Key);
     }
 
     public long IndexOf(KeyValuePair<TKey, TValue> item) {
-        if (!_indexByKey.TryGetValue(item.Key, out int index))
+        if (!_indexByKey.TryGetValue(item.Key, out long index))
             return -1;
-
         return EqualityComparer<TValue>.Default.Equals(_items[index].Value, item.Value) ? index : -1;
     }
 
     public void Clear() {
         _items.Clear();
         _indexByKey.Clear();
+    }
+
+    public void Compact() {
+        _items.Compact();
+        _indexByKey.Compact();
     }
 
     public void CopyTo(WideArray<KeyValuePair<TKey, TValue>> array, long arrayIndex) {
@@ -222,21 +223,19 @@ public class WideOrderedDictionary<TKey, TValue> : IWideCollection<KeyValuePair<
         if (array.Length - arrayIndex < Count)
             throw new ArgumentException("Destination does not have enough space.", nameof(array));
 
-        for (int i = 0; i < _items.Count; i++)
+        for (long i = 0; i < _items.Count; i++)
             array[arrayIndex + i] = _items[i];
     }
 
     public long EnsureCapacity(long capacity) {
-        if (capacity < 0 || capacity > int.MaxValue)
-            throw new ArgumentOutOfRangeException(nameof(capacity), "Capacity must be between 0 and Int32.MaxValue.");
-
-        if (_items.Capacity < (int)capacity)
-            _items.Capacity = (int)capacity;
-
+        if (capacity < 0)
+            throw new ArgumentOutOfRangeException(nameof(capacity), "Capacity cannot be negative.");
+        if (_items.Capacity < capacity)
+            _items.Capacity = capacity;
         return _items.Capacity;
     }
 
-    public void TrimExcess() => _items.TrimExcess();
+    public void TrimExcess() => _items.Capacity = _items.Count;
 
     void IWideCollection<KeyValuePair<TKey, TValue>>.Add(KeyValuePair<TKey, TValue> item) => Add(item.Key, item.Value);
 
@@ -251,7 +250,6 @@ public class WideOrderedDictionary<TKey, TValue> : IWideCollection<KeyValuePair<
     void IWideDictionary.Remove(object key) {
         if (key is null)
             throw new ArgumentNullException(nameof(key));
-
         if (key is TKey typedKey)
             Remove(typedKey);
     }
@@ -259,7 +257,6 @@ public class WideOrderedDictionary<TKey, TValue> : IWideCollection<KeyValuePair<
     long IWideList.Add(object value) {
         if (value is not KeyValuePair<TKey, TValue> pair)
             throw new ArgumentException($"Value must be of type {typeof(KeyValuePair<TKey, TValue>)}.", nameof(value));
-
         Add(pair.Key, pair.Value);
         return Count - 1;
     }
@@ -271,7 +268,6 @@ public class WideOrderedDictionary<TKey, TValue> : IWideCollection<KeyValuePair<
     void IWideList.Insert(long index, object value) {
         if (value is not KeyValuePair<TKey, TValue> pair)
             throw new ArgumentException($"Value must be of type {typeof(KeyValuePair<TKey, TValue>)}.", nameof(value));
-
         Insert(index, pair);
     }
 
@@ -287,7 +283,7 @@ public class WideOrderedDictionary<TKey, TValue> : IWideCollection<KeyValuePair<
 
     private void SetValueByKey(TKey key, TValue value) {
         ArgumentNullException.ThrowIfNull(key);
-        if (_indexByKey.TryGetValue(key, out int index)) {
+        if (_indexByKey.TryGetValue(key, out long index)) {
             _items[index] = new KeyValuePair<TKey, TValue>(key, value);
             return;
         }
@@ -296,42 +292,27 @@ public class WideOrderedDictionary<TKey, TValue> : IWideCollection<KeyValuePair<
     }
 
     private void SetItemAtIndex(long index, KeyValuePair<TKey, TValue> item) {
-        int itemIndex = ValidateIndex(index);
-        KeyValuePair<TKey, TValue> existing = _items[itemIndex];
-
+        KeyValuePair<TKey, TValue> existing = _items[index];
         if (!Comparer.Equals(existing.Key, item.Key) && _indexByKey.ContainsKey(item.Key))
             throw new ArgumentException("An item with the same key has already been added.", nameof(item));
 
-        _items[itemIndex] = item;
+        _items[index] = item;
         if (!Comparer.Equals(existing.Key, item.Key)) {
             _indexByKey.Remove(existing.Key);
-            _indexByKey[item.Key] = itemIndex;
+            _indexByKey[item.Key] = index;
         }
     }
 
-    private int FindIndexByKey(TKey key) {
+    private long FindIndexByKey(TKey key) {
         ArgumentNullException.ThrowIfNull(key);
-        if (_indexByKey.TryGetValue(key, out int index))
+        if (_indexByKey.TryGetValue(key, out long index))
             return index;
-
         throw new KeyNotFoundException("The given key was not present in the dictionary.");
     }
 
-    private void ReindexFrom(int startIndex) {
-        for (int i = startIndex; i < _items.Count; i++)
+    private void ReindexFrom(long startIndex) {
+        for (long i = startIndex; i < _items.Count; i++)
             _indexByKey[_items[i].Key] = i;
-    }
-
-    private int ValidateIndex(long index) {
-        if (index < 0 || index >= Count || index > int.MaxValue)
-            throw new ArgumentOutOfRangeException(nameof(index), "Index is out of range.");
-        return (int)index;
-    }
-
-    private int ValidateInsertIndex(long index) {
-        if (index < 0 || index > Count || index > int.MaxValue)
-            throw new ArgumentOutOfRangeException(nameof(index), "Index is out of range.");
-        return (int)index;
     }
 
     private static void ValidateObjectKey(object key) {
@@ -349,40 +330,71 @@ public class WideOrderedDictionary<TKey, TValue> : IWideCollection<KeyValuePair<
     }
 
     public struct Enumerator : IEnumerator<KeyValuePair<TKey, TValue>> {
-        private List<KeyValuePair<TKey, TValue>>.Enumerator _enumerator;
+        private readonly WideOrderedDictionary<TKey, TValue> _dictionary;
+        private long _index;
+        private KeyValuePair<TKey, TValue> _current;
 
         internal Enumerator(WideOrderedDictionary<TKey, TValue> dictionary) {
-            _enumerator = dictionary._items.GetEnumerator();
+            _dictionary = dictionary;
+            _index = 0;
+            _current = default;
         }
 
-        public KeyValuePair<TKey, TValue> Current => _enumerator.Current;
-        object IEnumerator.Current => _enumerator.Current;
+        public KeyValuePair<TKey, TValue> Current => _current;
+        object IEnumerator.Current => _current;
 
-        public bool MoveNext() => _enumerator.MoveNext();
-        public void Reset() => ((IEnumerator)_enumerator).Reset();
-        public void Dispose() => _enumerator.Dispose();
+        public bool MoveNext() {
+            if (_index < _dictionary.Count) {
+                _current = _dictionary._items[_index];
+                _index++;
+                return true;
+            }
+
+            _current = default;
+            _index = _dictionary.Count + 1;
+            return false;
+        }
+
+        public void Reset() {
+            _index = 0;
+            _current = default;
+        }
+
+        public void Dispose() { }
     }
 
     private sealed class DictionaryEnumerator : IDictionaryEnumerator {
-        private List<KeyValuePair<TKey, TValue>>.Enumerator _enumerator;
+        private Enumerator _enumerator;
+        private bool _valid;
 
         public DictionaryEnumerator(WideOrderedDictionary<TKey, TValue> dictionary) {
-            _enumerator = dictionary._items.GetEnumerator();
+            _enumerator = dictionary.GetEnumerator();
+            _valid = false;
         }
 
         public DictionaryEntry Entry {
             get {
+                if (!_valid)
+                    throw new InvalidOperationException("Enumerator is not on a valid element.");
+
                 KeyValuePair<TKey, TValue> current = _enumerator.Current;
                 return new DictionaryEntry(current.Key!, current.Value);
             }
         }
 
-        public object Key => _enumerator.Current.Key!;
-        public object Value => _enumerator.Current.Value!;
+        public object Key => Entry.Key;
+        public object Value => Entry.Value;
         public object Current => Entry;
 
-        public bool MoveNext() => _enumerator.MoveNext();
-        public void Reset() => ((IEnumerator)_enumerator).Reset();
+        public bool MoveNext() {
+            _valid = _enumerator.MoveNext();
+            return _valid;
+        }
+
+        public void Reset() {
+            ((IEnumerator)_enumerator).Reset();
+            _valid = false;
+        }
     }
 
     public sealed class KeyCollection : IWideCollection<TKey>, IWideCollection {
@@ -406,7 +418,7 @@ public class WideOrderedDictionary<TKey, TValue> : IWideCollection<KeyValuePair<
             if (array.Length - arrayIndex < Count)
                 throw new ArgumentException("Destination does not have enough space.", nameof(array));
 
-            for (int i = 0; i < _dictionary._items.Count; i++)
+            for (long i = 0; i < _dictionary.Count; i++)
                 array[arrayIndex + i] = _dictionary._items[i].Key;
         }
 
@@ -415,8 +427,8 @@ public class WideOrderedDictionary<TKey, TValue> : IWideCollection<KeyValuePair<
         public void Clear() => throw new NotSupportedException("Collection is read-only.");
 
         public IEnumerator<TKey> GetEnumerator() {
-            foreach (KeyValuePair<TKey, TValue> pair in _dictionary._items)
-                yield return pair.Key;
+            for (long i = 0; i < _dictionary.Count; i++)
+                yield return _dictionary._items[i].Key;
         }
 
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
@@ -443,7 +455,7 @@ public class WideOrderedDictionary<TKey, TValue> : IWideCollection<KeyValuePair<
             if (array.Length - arrayIndex < Count)
                 throw new ArgumentException("Destination does not have enough space.", nameof(array));
 
-            for (int i = 0; i < _dictionary._items.Count; i++)
+            for (long i = 0; i < _dictionary.Count; i++)
                 array[arrayIndex + i] = _dictionary._items[i].Value;
         }
 
@@ -452,8 +464,8 @@ public class WideOrderedDictionary<TKey, TValue> : IWideCollection<KeyValuePair<
         public void Clear() => throw new NotSupportedException("Collection is read-only.");
 
         public IEnumerator<TValue> GetEnumerator() {
-            foreach (KeyValuePair<TKey, TValue> pair in _dictionary._items)
-                yield return pair.Value;
+            for (long i = 0; i < _dictionary.Count; i++)
+                yield return _dictionary._items[i].Value;
         }
 
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();

@@ -102,4 +102,21 @@ public sealed class WideDictionaryTests {
 
         Assert.Throws<InvalidOperationException>(() => enumerator.MoveNext());
     }
+
+    [TestMethod]
+    public void Compact_AfterRemovingMostItems_ShrinksBackingStorage() {
+        WideDictionary<int, int> dictionary = new();
+        for (int i = 0; i < 30; i++)
+            dictionary.Add(i, i * 10);
+
+        for (int i = 0; i < 25; i++)
+            dictionary.Remove(i);
+
+        long before = dictionary.InternalEntriesLength;
+        dictionary.Compact();
+        long after = dictionary.InternalEntriesLength;
+
+        Assert.IsTrue(after < before);
+        CollectionAssert.AreEquivalent(new[] { 25, 26, 27, 28, 29 }, dictionary.Keys.OrderBy(x => x).ToArray());
+    }
 }

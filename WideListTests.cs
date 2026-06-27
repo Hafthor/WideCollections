@@ -86,4 +86,20 @@ public sealed class WideListTests {
         Assert.Throws<NotImplementedException>(() => list.Insert(0, 1));
         Assert.Throws<NotImplementedException>(() => list.Remove(1));
     }
+
+    [TestMethod]
+    public void Compact_AfterRemovingMostItems_ShrinksCapacityToCount() {
+        WideList<int> list = new(64);
+        for (int i = 0; i < 20; i++)
+            list.Add(i);
+
+        for (int i = 0; i < 17; i++)
+            list.RemoveAt(list.Count - 1);
+
+        Assert.IsTrue(list.Capacity > list.Count);
+        list.Compact();
+
+        Assert.AreEqual(list.Count, list.Capacity);
+        CollectionAssert.AreEqual(new[] { 0, 1, 2 }, list.ToArray());
+    }
 }

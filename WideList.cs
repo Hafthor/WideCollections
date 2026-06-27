@@ -5,7 +5,7 @@ namespace WideCollections;
 /// <summary>
 /// A generic list backed by WideArray that can grow beyond Array.MaxLength.
 /// </summary>
-public class WideList<T> : IWideList<T>, IWideList, IWideReadOnlyList<T> {
+public class WideList<T> : IWideList<T>, IWideList, IWideReadOnlyList<T>, ICompactable {
     private WideArray<T> _items;
     private long _count = 0;
 
@@ -160,6 +160,8 @@ public class WideList<T> : IWideList<T>, IWideList, IWideReadOnlyList<T> {
             _count = 0;
         }
     }
+
+    public void Compact() => Capacity = _count;
 
     private void EnsureCapacity(long min) {
         long newCapacity = _items.Length == 0 ? 4 : _items.Length;

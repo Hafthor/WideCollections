@@ -121,4 +121,20 @@ public sealed class WideSortedListTests {
         list.TrimExcess();
         Assert.AreEqual(list.Count, list.Capacity);
     }
+
+    [TestMethod]
+    public void Compact_AfterRemovingMostItems_ShrinksCapacityToCount() {
+        WideSortedList<int, int> list = new(64);
+        for (int i = 0; i < 30; i++)
+            list.Add(i, i);
+
+        for (int i = 0; i < 25; i++)
+            list.Remove(i);
+
+        Assert.IsTrue(list.Capacity > list.Count);
+        list.Compact();
+
+        Assert.AreEqual(list.Count, list.Capacity);
+        CollectionAssert.AreEqual(new[] { 25, 26, 27, 28, 29 }, list.Keys.ToArray());
+    }
 }

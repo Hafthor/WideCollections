@@ -96,4 +96,21 @@ public sealed class WideHashSetTests {
 
         Assert.Throws<InvalidOperationException>(() => enumerator.MoveNext());
     }
+
+    [TestMethod]
+    public void Compact_AfterRemovingMostItems_ShrinksBackingStorage() {
+        WideHashSet<int> set = new();
+        for (int i = 0; i < 30; i++)
+            set.Add(i);
+
+        for (int i = 0; i < 25; i++)
+            set.Remove(i);
+
+        long before = set.InternalEntriesLength;
+        set.Compact();
+        long after = set.InternalEntriesLength;
+
+        Assert.IsTrue(after < before);
+        CollectionAssert.AreEquivalent(new[] { 25, 26, 27, 28, 29 }, set.OrderBy(x => x).ToArray());
+    }
 }

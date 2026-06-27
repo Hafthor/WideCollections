@@ -4,7 +4,8 @@ namespace WideCollections;
 
 public class WideQueue<T> : IEnumerable<T>,
     IWideCollection,
-    IWideReadOnlyCollection<T> {
+    IWideReadOnlyCollection<T>,
+    ICompactable {
     private WideArray<T> _items;
     private long _head;
     private long _tail;
@@ -119,6 +120,8 @@ public class WideQueue<T> : IEnumerable<T>,
         _head = 0;
         _tail = 0;
     }
+
+    public void Compact() => SetCapacity(_count);
 
     public bool Contains(T item) {
         var comparer = EqualityComparer<T>.Default;

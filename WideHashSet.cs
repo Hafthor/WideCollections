@@ -2,7 +2,7 @@ using System.Collections;
 
 namespace WideCollections;
 
-public class WideHashSet<T> : IWideSet<T>, IWideReadOnlySet<T> {
+public class WideHashSet<T> : IWideSet<T>, IWideReadOnlySet<T>, ICompactable {
     private const long Lower31BitMask = 0x7FFFFFFF;
 
     private static readonly long[] Primes = [
@@ -56,6 +56,7 @@ public class WideHashSet<T> : IWideSet<T>, IWideReadOnlySet<T> {
     public long Count => _count - _freeCount;
     public bool IsReadOnly => false;
     public IEqualityComparer<T> Comparer => _comparer;
+    internal long InternalEntriesLength => _entries.Length;
 
     public bool Add(T item) => AddIfNotPresent(item);
 
@@ -307,6 +308,43 @@ public class WideHashSet<T> : IWideSet<T>, IWideReadOnlySet<T> {
         }
 
         return true;
+    }
+
+    public void Compact() {
+        long liveCount = Count;
+        if (liveCount == 0) {
+            _buckets = new WideArray<long>();
+            _entries = new WideArray<Entry>();
+            _count = 0;
+            _freeList = -1;
+            _freeCount = 0;
+            _version++;
+            return;
+        }
+
+        long newSize = GetPrime(liveCount);
+        WideArray<long> newBuckets = new(newSize);
+        WideArray<Entry> newEntries = new(newSize);
+
+        long newIndex = 0;
+        for (long i = 0; i < _count; i++) {
+            Entry entry = _entries[i];
+            if (entry.HashCode < 0)
+                continue;
+
+            long bucket = entry.HashCode % newSize;
+            entry.Next = newBuckets[bucket] - 1;
+            newEntries[newIndex] = entry;
+            newBuckets[bucket] = newIndex + 1;
+            newIndex++;
+        }
+
+        _buckets = newBuckets;
+        _entries = newEntries;
+        _count = newIndex;
+        _freeCount = 0;
+        _freeList = -1;
+        _version++;
     }
 
     public IEnumerator<T> GetEnumerator() => new Enumerator(this);

@@ -3,15 +3,18 @@ using System.Collections;
 namespace WideCollections;
 
 public class WideSortedDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>, IWideDictionary, IWideReadOnlyDictionary<TKey, TValue>
+    , ICompactable
     where TKey : notnull {
-    private readonly SortedDictionary<TKey, TValue> _dictionary;
+    private readonly WideList<KeyValuePair<TKey, TValue>> _items;
+    private readonly IComparer<TKey> _comparer;
     private KeyCollection _keys;
     private ValueCollection _values;
 
     public WideSortedDictionary() : this((IComparer<TKey>)null) { }
 
     public WideSortedDictionary(IComparer<TKey> comparer) {
-        _dictionary = comparer is null ? new SortedDictionary<TKey, TValue>() : new SortedDictionary<TKey, TValue>(comparer);
+        _items = new WideList<KeyValuePair<TKey, TValue>>();
+        _comparer = comparer ?? Comparer<TKey>.Default;
         SyncRoot = new object();
     }
 
@@ -20,7 +23,7 @@ public class WideSortedDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>,
     public WideSortedDictionary(IDictionary<TKey, TValue> dictionary, IComparer<TKey> comparer) : this(comparer) {
         ArgumentNullException.ThrowIfNull(dictionary);
         foreach (KeyValuePair<TKey, TValue> pair in dictionary)
-            _dictionary.Add(pair.Key, pair.Value);
+            Add(pair.Key, pair.Value);
     }
 
     public WideSortedDictionary(IEnumerable<KeyValuePair<TKey, TValue>> collection) : this(collection, null) { }
@@ -28,30 +31,45 @@ public class WideSortedDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>,
     public WideSortedDictionary(IEnumerable<KeyValuePair<TKey, TValue>> collection, IComparer<TKey> comparer) : this(comparer) {
         ArgumentNullException.ThrowIfNull(collection);
         foreach (KeyValuePair<TKey, TValue> pair in collection)
-            _dictionary.Add(pair.Key, pair.Value);
+            Add(pair.Key, pair.Value);
     }
 
-    public long Count => _dictionary.Count;
+    public long Count => _items.Count;
     public bool IsReadOnly => false;
     public bool IsFixedSize => false;
     public object SyncRoot { get; }
     public bool IsSynchronized => false;
-    public IComparer<TKey> Comparer => _dictionary.Comparer;
+    public IComparer<TKey> Comparer => _comparer;
+    internal long InternalItemsCapacity => _items.Capacity;
 
     public TValue this[TKey key] {
-        get => _dictionary[key];
-        set => _dictionary[key] = value;
+        get {
+            long index = FindIndex(key);
+            if (index >= 0)
+                return _items[index].Value;
+
+            throw new KeyNotFoundException("The given key was not present in the dictionary.");
+        }
+        set {
+            long index = FindIndex(key);
+            if (index >= 0) {
+                _items[index] = new KeyValuePair<TKey, TValue>(key, value);
+                return;
+            }
+
+            _items.Insert(~index, new KeyValuePair<TKey, TValue>(key, value));
+        }
     }
 
     object IWideDictionary.this[object key] {
         get {
             ValidateObjectKey(key);
-            return _dictionary[(TKey)key]!;
+            return this[(TKey)key]!;
         }
         set {
             ValidateObjectKey(key);
             ValidateObjectValue(value);
-            _dictionary[(TKey)key] = (TValue)value;
+            this[(TKey)key] = (TValue)value;
         }
     }
 
@@ -62,13 +80,20 @@ public class WideSortedDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>,
     IWideCollection IWideDictionary.Keys => (IWideCollection)Keys;
     IWideCollection IWideDictionary.Values => (IWideCollection)Values;
 
-    public void Add(TKey key, TValue value) => _dictionary.Add(key, value);
+    public void Add(TKey key, TValue value) {
+        long index = FindIndex(key);
+        if (index >= 0)
+            throw new ArgumentException("An item with the same key has already been added.", nameof(key));
+
+        _items.Insert(~index, new KeyValuePair<TKey, TValue>(key, value));
+    }
 
     public bool TryAdd(TKey key, TValue value) {
-        if (_dictionary.ContainsKey(key))
+        long index = FindIndex(key);
+        if (index >= 0)
             return false;
 
-        _dictionary.Add(key, value);
+        _items.Insert(~index, new KeyValuePair<TKey, TValue>(key, value));
         return true;
     }
 
@@ -80,51 +105,78 @@ public class WideSortedDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>,
         Add((TKey)key, (TValue)value);
     }
 
-    public bool ContainsKey(TKey key) => _dictionary.ContainsKey(key);
+    public bool ContainsKey(TKey key) => FindIndex(key) >= 0;
 
     public bool ContainsValue(TValue value) {
         var comparer = EqualityComparer<TValue>.Default;
-        foreach (TValue current in _dictionary.Values) {
-            if (comparer.Equals(current, value))
+        for (long i = 0; i < _items.Count; i++) {
+            if (comparer.Equals(_items[i].Value, value))
                 return true;
         }
 
         return false;
     }
 
-    public bool TryGetValue(TKey key, out TValue value) => _dictionary.TryGetValue(key, out value);
+    public bool TryGetValue(TKey key, out TValue value) {
+        long index = FindIndex(key);
+        if (index >= 0) {
+            value = _items[index].Value;
+            return true;
+        }
 
-    public bool Remove(TKey key) => _dictionary.Remove(key);
-
-    public bool Remove(TKey key, out TValue value) {
-        if (_dictionary.TryGetValue(key, out value))
-            return _dictionary.Remove(key);
-
+        value = default!;
         return false;
     }
 
-    public bool Contains(KeyValuePair<TKey, TValue> item) =>
-        _dictionary.TryGetValue(item.Key, out TValue value) &&
-        EqualityComparer<TValue>.Default.Equals(value, item.Value);
+    public bool Remove(TKey key) {
+        long index = FindIndex(key);
+        if (index < 0)
+            return false;
+
+        _items.RemoveAt(index);
+        return true;
+    }
+
+    public bool Remove(TKey key, out TValue value) {
+        long index = FindIndex(key);
+        if (index < 0) {
+            value = default!;
+            return false;
+        }
+
+        value = _items[index].Value;
+        _items.RemoveAt(index);
+        return true;
+    }
+
+    public bool Contains(KeyValuePair<TKey, TValue> item) {
+        long index = FindIndex(item.Key);
+        if (index < 0)
+            return false;
+
+        return EqualityComparer<TValue>.Default.Equals(_items[index].Value, item.Value);
+    }
 
     public bool Remove(KeyValuePair<TKey, TValue> item) {
         if (!Contains(item))
             return false;
 
-        return _dictionary.Remove(item.Key);
+        return Remove(item.Key);
     }
 
-    bool IWideDictionary.Contains(object key) => key is TKey typedKey && _dictionary.ContainsKey(typedKey);
+    bool IWideDictionary.Contains(object key) => key is TKey typedKey && ContainsKey(typedKey);
 
     void IWideDictionary.Remove(object key) {
         if (key is null)
             throw new ArgumentNullException(nameof(key));
 
         if (key is TKey typedKey)
-            _dictionary.Remove(typedKey);
+            Remove(typedKey);
     }
 
-    public void Clear() => _dictionary.Clear();
+    public void Clear() => _items.Clear();
+
+    public void Compact() => _items.Compact();
 
     public void CopyTo(WideArray<KeyValuePair<TKey, TValue>> array, long arrayIndex) {
         ArgumentNullException.ThrowIfNull(array);
@@ -135,17 +187,33 @@ public class WideSortedDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>,
         if (array.Length - arrayIndex < Count)
             throw new ArgumentException("Destination does not have enough space.", nameof(array));
 
-        long i = arrayIndex;
-        foreach (KeyValuePair<TKey, TValue> pair in _dictionary) {
-            array[i] = pair;
-            i++;
-        }
+        for (long i = 0; i < Count; i++)
+            array[arrayIndex + i] = _items[i];
     }
 
     public Enumerator GetEnumerator() => new(this);
     IEnumerator<KeyValuePair<TKey, TValue>> IEnumerable<KeyValuePair<TKey, TValue>>.GetEnumerator() => GetEnumerator();
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
-    IDictionaryEnumerator IWideDictionary.GetEnumerator() => new DictionaryEnumerator(_dictionary.GetEnumerator());
+    IDictionaryEnumerator IWideDictionary.GetEnumerator() => new DictionaryEnumerator(this);
+
+    private long FindIndex(TKey key) {
+        ArgumentNullException.ThrowIfNull(key);
+
+        long lo = 0;
+        long hi = _items.Count - 1;
+        while (lo <= hi) {
+            long mid = lo + ((hi - lo) >> 1);
+            int cmp = _comparer.Compare(_items[mid].Key, key);
+            if (cmp == 0)
+                return mid;
+            if (cmp < 0)
+                lo = mid + 1;
+            else
+                hi = mid - 1;
+        }
+
+        return ~lo;
+    }
 
     private static void ValidateObjectKey(object key) {
         if (key is null)
@@ -162,40 +230,71 @@ public class WideSortedDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>,
     }
 
     public struct Enumerator : IEnumerator<KeyValuePair<TKey, TValue>> {
-        private SortedDictionary<TKey, TValue>.Enumerator _enumerator;
+        private readonly WideSortedDictionary<TKey, TValue> _dictionary;
+        private long _index;
+        private KeyValuePair<TKey, TValue> _current;
 
         internal Enumerator(WideSortedDictionary<TKey, TValue> dictionary) {
-            _enumerator = dictionary._dictionary.GetEnumerator();
+            _dictionary = dictionary;
+            _index = 0;
+            _current = default;
         }
 
-        public KeyValuePair<TKey, TValue> Current => _enumerator.Current;
-        object IEnumerator.Current => _enumerator.Current;
+        public KeyValuePair<TKey, TValue> Current => _current;
+        object IEnumerator.Current => _current;
 
-        public bool MoveNext() => _enumerator.MoveNext();
-        public void Reset() => ((IEnumerator)_enumerator).Reset();
-        public void Dispose() => _enumerator.Dispose();
+        public bool MoveNext() {
+            if (_index < _dictionary.Count) {
+                _current = _dictionary._items[_index];
+                _index++;
+                return true;
+            }
+
+            _current = default;
+            _index = _dictionary.Count + 1;
+            return false;
+        }
+
+        public void Reset() {
+            _index = 0;
+            _current = default;
+        }
+
+        public void Dispose() { }
     }
 
     private sealed class DictionaryEnumerator : IDictionaryEnumerator {
-        private SortedDictionary<TKey, TValue>.Enumerator _enumerator;
+        private Enumerator _enumerator;
+        private bool _valid;
 
-        public DictionaryEnumerator(SortedDictionary<TKey, TValue>.Enumerator enumerator) {
-            _enumerator = enumerator;
+        public DictionaryEnumerator(WideSortedDictionary<TKey, TValue> dictionary) {
+            _enumerator = dictionary.GetEnumerator();
+            _valid = false;
         }
 
         public DictionaryEntry Entry {
             get {
+                if (!_valid)
+                    throw new InvalidOperationException("Enumerator is not on a valid element.");
+
                 KeyValuePair<TKey, TValue> current = _enumerator.Current;
                 return new DictionaryEntry(current.Key!, current.Value);
             }
         }
 
-        public object Key => _enumerator.Current.Key!;
-        public object Value => _enumerator.Current.Value!;
+        public object Key => Entry.Key;
+        public object Value => Entry.Value;
         public object Current => Entry;
 
-        public bool MoveNext() => _enumerator.MoveNext();
-        public void Reset() => ((IEnumerator)_enumerator).Reset();
+        public bool MoveNext() {
+            _valid = _enumerator.MoveNext();
+            return _valid;
+        }
+
+        public void Reset() {
+            ((IEnumerator)_enumerator).Reset();
+            _valid = false;
+        }
     }
 
     public sealed class KeyCollection : IWideCollection<TKey>, IWideCollection {
@@ -208,7 +307,7 @@ public class WideSortedDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>,
         public object SyncRoot => _dictionary.SyncRoot;
         public bool IsSynchronized => false;
 
-        public bool Contains(TKey item) => _dictionary._dictionary.ContainsKey(item);
+        public bool Contains(TKey item) => _dictionary.ContainsKey(item);
 
         public void CopyTo(WideArray<TKey> array, long arrayIndex) {
             ArgumentNullException.ThrowIfNull(array);
@@ -219,18 +318,19 @@ public class WideSortedDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>,
             if (array.Length - arrayIndex < Count)
                 throw new ArgumentException("Destination does not have enough space.", nameof(array));
 
-            long i = arrayIndex;
-            foreach (TKey key in _dictionary._dictionary.Keys) {
-                array[i] = key;
-                i++;
-            }
+            for (long i = 0; i < _dictionary.Count; i++)
+                array[arrayIndex + i] = _dictionary._items[i].Key;
         }
 
         public void Add(TKey item) => throw new NotSupportedException("Collection is read-only.");
         public bool Remove(TKey item) => throw new NotSupportedException("Collection is read-only.");
         public void Clear() => throw new NotSupportedException("Collection is read-only.");
 
-        public IEnumerator<TKey> GetEnumerator() => _dictionary._dictionary.Keys.GetEnumerator();
+        public IEnumerator<TKey> GetEnumerator() {
+            for (long i = 0; i < _dictionary.Count; i++)
+                yield return _dictionary._items[i].Key;
+        }
+
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
 
@@ -244,15 +344,7 @@ public class WideSortedDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>,
         public object SyncRoot => _dictionary.SyncRoot;
         public bool IsSynchronized => false;
 
-        public bool Contains(TValue item) {
-            var comparer = EqualityComparer<TValue>.Default;
-            foreach (TValue value in _dictionary._dictionary.Values) {
-                if (comparer.Equals(value, item))
-                    return true;
-            }
-
-            return false;
-        }
+        public bool Contains(TValue item) => _dictionary.ContainsValue(item);
 
         public void CopyTo(WideArray<TValue> array, long arrayIndex) {
             ArgumentNullException.ThrowIfNull(array);
@@ -263,18 +355,19 @@ public class WideSortedDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>,
             if (array.Length - arrayIndex < Count)
                 throw new ArgumentException("Destination does not have enough space.", nameof(array));
 
-            long i = arrayIndex;
-            foreach (TValue value in _dictionary._dictionary.Values) {
-                array[i] = value;
-                i++;
-            }
+            for (long i = 0; i < _dictionary.Count; i++)
+                array[arrayIndex + i] = _dictionary._items[i].Value;
         }
 
         public void Add(TValue item) => throw new NotSupportedException("Collection is read-only.");
         public bool Remove(TValue item) => throw new NotSupportedException("Collection is read-only.");
         public void Clear() => throw new NotSupportedException("Collection is read-only.");
 
-        public IEnumerator<TValue> GetEnumerator() => _dictionary._dictionary.Values.GetEnumerator();
+        public IEnumerator<TValue> GetEnumerator() {
+            for (long i = 0; i < _dictionary.Count; i++)
+                yield return _dictionary._items[i].Value;
+        }
+
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
 }

@@ -102,4 +102,21 @@ public sealed class WideSortedSetTests {
         CollectionAssert.AreEqual(new[] { 0, 1, 2, 3, 0 }, offset);
         CollectionAssert.AreEqual(new[] { 0, 1, 2, 0 }, partial);
     }
+
+    [TestMethod]
+    public void Compact_AfterRemovingMostItems_ShrinksBackingStorage() {
+        WideSortedSet<int> set = new();
+        for (int i = 0; i < 30; i++)
+            set.Add(i);
+
+        for (int i = 0; i < 25; i++)
+            set.Remove(i);
+
+        long before = set.InternalItemsCapacity;
+        set.Compact();
+        long after = set.InternalItemsCapacity;
+
+        Assert.IsTrue(after < before);
+        CollectionAssert.AreEqual(new[] { 25, 26, 27, 28, 29 }, set.ToArray());
+    }
 }
