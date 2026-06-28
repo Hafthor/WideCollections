@@ -103,8 +103,7 @@ public class WideList<T> : IWideList<T>, IWideList, IWideReadOnlyList<T>, IWideI
         ArgumentOutOfRangeException.ThrowIfGreaterThan(arrayIndex, array.Length);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(arrayIndex, array.Length - _count);
 
-        for (long i = 0; i < _count; i++)
-            array[arrayIndex + i] = Items[i];
+        WideArray<T>.BulkCopy(Items, 0, array, arrayIndex, _count);
     }
 
     public bool Remove(T item) {

@@ -69,8 +69,7 @@ public readonly struct WideReadOnlyMemory<T> : IWideEnumerable<T> {
     public bool TryCopyTo(WideArray<T> destination) {
         if (destination is null || destination.Length < Length)
             return false;
-        for (long i = 0; i < Length; i++)
-            destination[i] = _source[_start + i];
+        WideArray<T>.BulkCopyFrom(_source, _start, destination, 0, Length);
         return true;
     }
 

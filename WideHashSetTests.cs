@@ -45,6 +45,23 @@ public sealed class WideHashSetTests {
     }
 
     [TestMethod]
+    public void CopyTo_SkipsRemovedEntries() {
+        WideHashSet<int> set = new();
+        set.Add(3);
+        set.Add(5);
+        set.Add(7);
+        set.Add(9);
+        Assert.IsTrue(set.Remove(5));
+        WideArray<int> destination = new(4);
+
+        set.CopyTo(destination, 1);
+
+        Assert.AreEqual(0, destination[0]);
+        int[] copied = [destination[1], destination[2], destination[3]];
+        CollectionAssert.AreEquivalent(new[] { 3, 7, 9 }, copied);
+    }
+
+    [TestMethod]
     public void UnionIntersectExceptAndSymmetricExcept_WorkLikeHashSet() {
         WideHashSet<int> set = new([1, 2, 3]);
 

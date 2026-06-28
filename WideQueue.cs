@@ -119,8 +119,10 @@ public class WideQueue<T> : IWideCollection, IWideReadOnlyCollection<T>, ICompac
         ArgumentOutOfRangeException.ThrowIfGreaterThan(arrayIndex, array.Length);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(_count, array.Length - arrayIndex);
 
-        for (long i = 0; i < _count; i++)
-            array[arrayIndex + i] = _items[GetIndex(i)];
+        long firstLen = Math.Min(_count, _items.Length - _head);
+        WideArray<T>.BulkCopy(_items, _head, array, arrayIndex, firstLen);
+        if (firstLen < _count)
+            WideArray<T>.BulkCopy(_items, 0, array, arrayIndex + firstLen, _count - firstLen);
     }
 
     private long GetIndex(long offset) {
@@ -134,8 +136,10 @@ public class WideQueue<T> : IWideCollection, IWideReadOnlyCollection<T>, ICompac
     private void SetCapacity(long capacity) {
         WideArray<T> newItems = new(capacity);
 
-        for (long i = 0; i < _count; i++)
-            newItems[i] = _items[GetIndex(i)];
+        long firstLen = Math.Min(_count, _items.Length - _head);
+        WideArray<T>.BulkCopy(_items, _head, newItems, 0, firstLen);
+        if (firstLen < _count)
+            WideArray<T>.BulkCopy(_items, 0, newItems, firstLen, _count - firstLen);
 
         _items = newItems;
         _head = 0;

@@ -342,8 +342,7 @@ public class WideDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
         WideArray<long> newBuckets = new(newSize);
         WideArray<Entry> newEntries = new(newSize);
 
-        for (long i = 0; i < _count; i++)
-            newEntries[i] = _entries[i];
+        WideArray<Entry>.BulkCopy(_entries, 0, newEntries, 0, _count);
 
         for (long i = 0; i < _count; i++) {
             Entry entry = newEntries[i];

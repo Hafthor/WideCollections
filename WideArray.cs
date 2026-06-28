@@ -179,8 +179,30 @@ public class WideArray<T> : IWideCollection<T>, IWideReadOnlyCollection<T>, IWid
         ArgumentOutOfRangeException.ThrowIfGreaterThan(arrayIndex, array.Length);
         ArgumentOutOfRangeException.ThrowIfLessThan(array.Length - arrayIndex, _length);
 
-        for (long i = 0; i < _length; i++)
-            array[arrayIndex + i] = this[i];
+        BulkCopy(this, 0, array, arrayIndex, _length);
+    }
+
+    /// <summary>
+    /// Bulk-copies a contiguous range from <paramref name="source"/> into <paramref name="destination"/>
+    /// using segment-aligned Array.Copy operations, even when segment sizes differ.
+    /// </summary>
+    internal static void BulkCopy(WideArray<T> source, long sourceIndex, WideArray<T> destination, long destinationIndex, long count) {
+        while (count > 0) {
+            int sSeg = (int)(sourceIndex >> source._segmentShift);
+            int sOff = (int)(sourceIndex & source._segmentMask);
+            int dSeg = (int)(destinationIndex >> destination._segmentShift);
+            int dOff = (int)(destinationIndex & destination._segmentMask);
+
+            int sAvail = source._segments[sSeg].Length - sOff;
+            int dAvail = destination._segments[dSeg].Length - dOff;
+            int chunk = (int)Math.Min(count, Math.Min(sAvail, dAvail));
+
+            Array.Copy(source._segments[sSeg], sOff, destination._segments[dSeg], dOff, chunk);
+
+            sourceIndex += chunk;
+            destinationIndex += chunk;
+            count -= chunk;
+        }
     }
     
     public bool Remove(T item) => throw new NotImplementedException();
@@ -194,6 +216,21 @@ public class WideArray<T> : IWideCollection<T>, IWideReadOnlyCollection<T>, IWid
     public WideMemory<T> AsMemory(long start, long length) => new WideMemory<T>(this).Slice(start, length);
     public WideReadOnlyMemory<T> AsReadOnlyMemory() => new WideReadOnlyMemory<T>(this);
     public WideReadOnlyMemory<T> AsReadOnlyMemory(long start, long length) => new WideReadOnlyMemory<T>(this).Slice(start, length);
+
+    /// <summary>
+    /// Bulk-copies a contiguous range from <paramref name="source"/> into <paramref name="destination"/>.
+    /// Uses segment-aligned Array.Copy when the source is a WideArray or WideList; otherwise falls back to indexing.
+    /// </summary>
+    internal static void BulkCopyFrom(IWideReadOnlyIndexable<T> source, long sourceIndex, WideArray<T> destination, long destinationIndex, long count) {
+        WideArray<T>? src = source as WideArray<T> ?? (source as WideList<T>)?.Items;
+        if (src is not null) {
+            BulkCopy(src, sourceIndex, destination, destinationIndex, count);
+            return;
+        }
+
+        for (long i = 0; i < count; i++)
+            destination[destinationIndex + i] = source[sourceIndex + i];
+    }
 
     public object Clone() {
         WideArray<T> clone = new(0, _segmentShift);

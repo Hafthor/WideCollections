@@ -73,6 +73,29 @@ public sealed class WideQueueTests {
     }
 
     [TestMethod]
+    public void CopyTo_WithWrapAround_CopiesInFifoOrder() {
+        WideQueue<int> queue = new(4);
+        queue.Enqueue(1);
+        queue.Enqueue(2);
+        queue.Enqueue(3);
+        queue.Enqueue(4);
+        queue.Dequeue();
+        queue.Dequeue();
+        queue.Enqueue(5);
+        queue.Enqueue(6);
+
+        WideArray<int> destination = new(6);
+        queue.CopyTo(destination, 1);
+
+        Assert.AreEqual(0, destination[0]);
+        Assert.AreEqual(3, destination[1]);
+        Assert.AreEqual(4, destination[2]);
+        Assert.AreEqual(5, destination[3]);
+        Assert.AreEqual(6, destination[4]);
+        Assert.AreEqual(0, destination[5]);
+    }
+
+    [TestMethod]
     public void CapacitySetter_ThrowsWhenValueIsLessThanCount() {
         WideQueue<int> queue = new();
         queue.Enqueue(1);

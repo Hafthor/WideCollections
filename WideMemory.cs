@@ -73,8 +73,7 @@ public readonly struct WideMemory<T> : IWideEnumerable<T> {
 
     public WideArray<T> ToWideArray() {
         WideArray<T> result = new(Length);
-        for (long i = 0; i < Length; i++)
-            result[i] = Source[Start + i];
+        WideArray<T>.BulkCopyFrom(Source, Start, result, 0, Length);
         return result;
     }
 
@@ -82,15 +81,13 @@ public readonly struct WideMemory<T> : IWideEnumerable<T> {
         ArgumentNullException.ThrowIfNull(destination);
         if (destination.Length < Length)
             throw new ArgumentException("Destination is too short.", nameof(destination));
-        for (long i = 0; i < Length; i++)
-            destination[i] = Source[Start + i];
+        WideArray<T>.BulkCopyFrom(Source, Start, destination, 0, Length);
     }
 
     public bool TryCopyTo(WideArray<T> destination) {
         if (destination is null || destination.Length < Length)
             return false;
-        for (long i = 0; i < Length; i++)
-            destination[i] = Source[Start + i];
+        WideArray<T>.BulkCopyFrom(Source, Start, destination, 0, Length);
         return true;
     }
 

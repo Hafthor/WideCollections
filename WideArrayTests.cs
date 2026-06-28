@@ -33,6 +33,23 @@ public sealed class WideArrayTests {
     }
 
     [TestMethod]
+    public void CopyTo_AcrossSegmentBoundaries_DifferingShifts() {
+        WideArray<int> source = new(10, 2);
+        for (int i = 0; i < 10; i++)
+            source[i] = i + 1;
+        WideArray<int> destination = new(15, 3);
+
+        source.CopyTo(destination, 3);
+
+        for (int i = 0; i < 3; i++)
+            Assert.AreEqual(0, destination[i]);
+        for (int i = 0; i < 10; i++)
+            Assert.AreEqual(i + 1, destination[3 + i]);
+        for (int i = 13; i < 15; i++)
+            Assert.AreEqual(0, destination[i]);
+    }
+
+    [TestMethod]
     public void CopyTo_CopiesWholeSourceAtOffset() {
         WideArray<int> source = new(3);
         source[0] = 1;

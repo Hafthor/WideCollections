@@ -53,8 +53,7 @@ public class WideSortedSet<T> : IWideSet<T>, IWideCollection, IWideReadOnlySet<T
         ArgumentOutOfRangeException.ThrowIfGreaterThan(arrayIndex, array.Length);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(arrayIndex + Count, array.Length);
 
-        for (long i = 0; i < Count; i++)
-            array[arrayIndex + i] = _items[i];
+        _items.CopyTo(array, arrayIndex);
     }
 
     public bool Remove(T item) {
