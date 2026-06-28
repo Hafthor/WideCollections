@@ -186,7 +186,7 @@ public sealed class WideListTests {
         for (int i = 0; i < 17; i++)
             list.RemoveAt(list.Count - 1);
 
-        Assert.IsTrue(list.Capacity > list.Count);
+        Assert.IsGreaterThan(list.Count, list.Capacity);
         list.Compact();
 
         Assert.AreEqual(list.Count, list.Capacity);

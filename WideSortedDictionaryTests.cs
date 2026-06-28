@@ -76,7 +76,7 @@ public sealed class WideSortedDictionaryTests {
         dictionary.Compact();
         long after = dictionary.InternalItemsCapacity;
 
-        Assert.IsTrue(after < before);
+        Assert.IsLessThan(before, after);
         CollectionAssert.AreEqual(new[] { 25, 26, 27, 28, 29 }, dictionary.Keys.ToArray());
     }
 }

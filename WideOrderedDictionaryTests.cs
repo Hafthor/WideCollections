@@ -86,7 +86,7 @@ public sealed class WideOrderedDictionaryTests {
     public void CapacityMethods_WorkAsExpected() {
         WideOrderedDictionary<int, int> dictionary = new(1);
         Assert.AreEqual(1L, dictionary.Capacity);
-        Assert.IsTrue(dictionary.EnsureCapacity(10) >= 10);
+        Assert.IsGreaterThanOrEqualTo(10, dictionary.EnsureCapacity(10));
         dictionary.Add(1, 1);
         dictionary.TrimExcess();
         Assert.AreEqual(dictionary.Count, dictionary.Capacity);
@@ -101,7 +101,7 @@ public sealed class WideOrderedDictionaryTests {
         for (int i = 0; i < 25; i++)
             dictionary.Remove(i);
 
-        Assert.IsTrue(dictionary.Capacity > dictionary.Count);
+        Assert.IsGreaterThan(dictionary.Count, dictionary.Capacity);
         dictionary.Compact();
 
         Assert.AreEqual(dictionary.Count, dictionary.Capacity);

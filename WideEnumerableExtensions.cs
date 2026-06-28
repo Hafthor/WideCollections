@@ -39,7 +39,7 @@ public static class WideEnumerableExtensions {
         if (source is IWideReadOnlyCollection<T> wideCollection)
             return wideCollection.Count;
 
-        if (source is ICollection<T> collection)
+        if (source is WideEnumerableAdapter<T> { Source: ICollection<T> collection })
             return collection.Count;
 
         long count = 0;
@@ -62,6 +62,13 @@ public static class WideEnumerableExtensions {
     public static T ElementAtLong<T>(this IWideEnumerable<T> source, long index) {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentOutOfRangeException.ThrowIfNegative(index);
+
+        object underlying = source is WideEnumerableAdapter<T> adapter ? adapter.Source : source;
+        if (underlying is IWideReadOnlyIndexable<T> indexable) {
+            if (index >= indexable.Count)
+                throw new ArgumentOutOfRangeException(nameof(index));
+            return indexable[index];
+        }
 
         long current = 0;
         foreach (T item in source) {
@@ -139,9 +146,10 @@ public static class WideEnumerableExtensions {
 
     public static WideArray<T> ToWideArray<T>(this IWideEnumerable<T> source) {
         ArgumentNullException.ThrowIfNull(source);
-        if (source is WideArray<T> array)
+        object underlying = source is WideEnumerableAdapter<T> adapter ? adapter.Source : source;
+        if (underlying is WideArray<T> array)
             return (WideArray<T>)array.Clone();
-        if (source is WideList<T> list) {
+        if (underlying is WideList<T> list) {
             WideArray<T> result = new(list.Count, list.Items.SegmentShift);
             T[][] src = list.Items.Segments, dst = result.Segments;
             for (int i = 0; i < dst.Length; i++)
@@ -166,6 +174,8 @@ public static class WideEnumerableExtensions {
     }
 
     private sealed class WideEnumerableAdapter<T>(IEnumerable<T> source) : IWideEnumerable<T> {
+        public IEnumerable<T> Source => source;
+
         public IEnumerator<T> GetEnumerator() => source.GetEnumerator();
 
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();

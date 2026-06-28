@@ -2,17 +2,9 @@ using System.Collections;
 
 namespace WideCollections;
 
-public class WideDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>, IWideDictionary, IWideReadOnlyDictionary<TKey, TValue>
-    , ICompactable
-    where TKey : notnull {
+public class WideDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>, IWideDictionary, 
+    IWideReadOnlyDictionary<TKey, TValue>, ICompactable where TKey : notnull {
     private const long Lower31BitMask = 0x7FFFFFFF;
-    private static readonly long[] Primes = [
-        3, 7, 11, 17, 23, 29, 37, 47, 59, 71, 89, 107, 131, 163, 197, 239, 293, 353, 431, 521, 631, 761, 919, 1103,
-        1327, 1597, 1931, 2333, 2801, 3371, 4049, 4861, 5839, 7013, 8419, 10103, 12143, 14591, 17519, 21023, 25229,
-        30293, 36353, 43627, 52361, 62851, 75431, 90523, 108631, 130363, 156437, 187751, 225307, 270371, 324449,
-        389357, 467237, 560689, 672827, 807403, 968897, 1162687, 1395263, 1674319, 2009191, 2411033, 2893249,
-        3471899, 4166287, 4999559, 5999471, 7199369
-    ];
 
     private WideArray<long> _buckets = new();
     private WideArray<Entry> _entries = new();
@@ -235,7 +227,7 @@ public class WideDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
             return;
         }
 
-        long newSize = GetPrime(liveCount);
+        long newSize = PrimeHelper.GetPrime(liveCount);
         WideArray<long> newBuckets = new(newSize);
         WideArray<Entry> newEntries = new(newSize);
 
@@ -331,14 +323,14 @@ public class WideDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
     }
 
     private void Initialize(long capacity) {
-        long size = GetPrime(capacity <= 0 ? 3 : capacity);
+        long size = PrimeHelper.GetPrime(capacity <= 0 ? 3 : capacity);
         _buckets = new WideArray<long>(size);
         _entries = new WideArray<Entry>(size);
         _freeList = -1;
     }
 
     private void Resize() {
-        long newSize = GetPrime(_count * 2);
+        long newSize = PrimeHelper.GetPrime(_count * 2);
         WideArray<long> newBuckets = new(newSize);
         WideArray<Entry> newEntries = new(newSize);
 
@@ -373,37 +365,6 @@ public class WideDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
 
         if (key is not TKey)
             throw new ArgumentException($"Key must be of type {typeof(TKey)}.", nameof(key));
-    }
-
-    private static long GetPrime(long min) {
-        for (int i = 0; i < Primes.Length; i++) {
-            long prime = Primes[i];
-            if (prime >= min)
-                return prime;
-        }
-
-        if (min <= 2)
-            return 3;
-
-        for (long candidate = (min | 1); candidate < long.MaxValue; candidate += 2) {
-            if (IsPrime(candidate) && ((candidate - 1) % 101 != 0))
-                return candidate;
-        }
-
-        return min;
-    }
-
-    private static bool IsPrime(long candidate) {
-        if ((candidate & 1) == 0)
-            return candidate == 2;
-
-        long limit = (long)Math.Sqrt(candidate);
-        for (long divisor = 3; divisor <= limit; divisor += 2) {
-            if (candidate % divisor == 0)
-                return false;
-        }
-
-        return true;
     }
 
     private enum InsertionBehavior {
@@ -456,20 +417,11 @@ public class WideDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
         public void Dispose() { }
     }
 
-    private sealed class DictionaryEnumerator : IDictionaryEnumerator {
-        private readonly WideDictionary<TKey, TValue> _dictionary;
-        private readonly long _version;
+    private sealed class DictionaryEnumerator(WideDictionary<TKey, TValue> dictionary) : IDictionaryEnumerator {
+        private readonly long _version = dictionary._version;
         private long _index;
         private bool _valid;
         private DictionaryEntry _current;
-
-        public DictionaryEnumerator(WideDictionary<TKey, TValue> dictionary) {
-            _dictionary = dictionary;
-            _version = dictionary._version;
-            _index = 0;
-            _valid = false;
-            _current = default;
-        }
 
         public DictionaryEntry Entry => _valid ? _current : throw new InvalidOperationException("Enumerator is not on a valid element.");
         public object Key => Entry.Key;
@@ -477,11 +429,11 @@ public class WideDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
         public object Current => Entry;
 
         public bool MoveNext() {
-            if (_version != _dictionary._version)
+            if (_version != dictionary._version)
                 throw new InvalidOperationException("Collection was modified during enumeration.");
 
-            while (_index < _dictionary._count) {
-                Entry entry = _dictionary._entries[_index];
+            while (_index < dictionary._count) {
+                Entry entry = dictionary._entries[_index];
                 _index++;
                 if (entry.HashCode >= 0) {
                     _current = new DictionaryEntry(entry.Key!, entry.Value);
@@ -495,7 +447,7 @@ public class WideDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
         }
 
         public void Reset() {
-            if (_version != _dictionary._version)
+            if (_version != dictionary._version)
                 throw new InvalidOperationException("Collection was modified during enumeration.");
 
             _index = 0;
@@ -504,7 +456,7 @@ public class WideDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
         }
     }
 
-    internal sealed class KeyCollection : WideKeyValueCollectionBase<TKey> {
+    private sealed class KeyCollection : WideKeyValueCollectionBase<TKey> {
         private readonly WideDictionary<TKey, TValue> _dictionary;
 
         internal KeyCollection(WideDictionary<TKey, TValue> dictionary) : base(dictionary.SyncRoot) 
@@ -551,7 +503,7 @@ public class WideDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
         }
     }
 
-    internal sealed class ValueCollection : WideKeyValueCollectionBase<TValue> {
+    private sealed class ValueCollection : WideKeyValueCollectionBase<TValue> {
         private readonly WideDictionary<TKey, TValue> _dictionary;
 
         internal ValueCollection(WideDictionary<TKey, TValue> dictionary) : base(dictionary.SyncRoot) 

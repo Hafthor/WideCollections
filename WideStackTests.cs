@@ -72,7 +72,7 @@ public sealed class WideStackTests {
         Assert.AreEqual(0L, stack.Count);
         Assert.IsFalse(stack.Contains("a"));
         Assert.IsFalse(stack.Contains("b"));
-        Assert.Throws<InvalidOperationException>(() => stack.Peek());
+        Assert.Throws<InvalidOperationException>(stack.Peek);
     }
 
     [TestMethod]
@@ -84,7 +84,7 @@ public sealed class WideStackTests {
         for (int i = 0; i < 17; i++)
             stack.Pop();
 
-        Assert.IsTrue(stack.Capacity > stack.Count);
+        Assert.IsGreaterThan(stack.Count, stack.Capacity);
         stack.Compact();
 
         Assert.AreEqual(stack.Count, stack.Capacity);

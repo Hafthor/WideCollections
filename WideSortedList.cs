@@ -263,14 +263,9 @@ public class WideSortedList<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
         public void Dispose() { }
     }
 
-    private sealed class DictionaryEnumerator : IDictionaryEnumerator {
-        private Enumerator _enumerator;
+    private sealed class DictionaryEnumerator(WideSortedList<TKey, TValue> list) : IDictionaryEnumerator {
+        private Enumerator _enumerator = list.GetEnumerator();
         private bool _valid;
-
-        public DictionaryEnumerator(WideSortedList<TKey, TValue> list) {
-            _enumerator = list.GetEnumerator();
-            _valid = false;
-        }
 
         public DictionaryEntry Entry {
             get {
@@ -292,12 +287,12 @@ public class WideSortedList<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
         }
 
         public void Reset() {
-            ((IEnumerator)_enumerator).Reset();
+            _enumerator.Reset();
             _valid = false;
         }
     }
 
-    internal sealed class KeyCollection : WideKeyValueCollectionBase<TKey> {
+    private sealed class KeyCollection : WideKeyValueCollectionBase<TKey> {
         private readonly WideSortedList<TKey, TValue> _list;
 
         internal KeyCollection(WideSortedList<TKey, TValue> list) : base(list.SyncRoot)
@@ -309,7 +304,7 @@ public class WideSortedList<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
         protected override TKey GetElementAt(long index) => _list._items[(int)index].Key;
     }
 
-    internal sealed class ValueCollection : WideKeyValueCollectionBase<TValue> {
+    private sealed class ValueCollection : WideKeyValueCollectionBase<TValue> {
         private readonly WideSortedList<TKey, TValue> _list;
 
         internal ValueCollection(WideSortedList<TKey, TValue> list) : base(list.SyncRoot)

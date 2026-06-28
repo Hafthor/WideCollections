@@ -341,7 +341,7 @@ public class WideOrderedDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>
 
     private sealed class DictionaryEnumerator(WideOrderedDictionary<TKey, TValue> dictionary) : IDictionaryEnumerator {
         private Enumerator _enumerator = dictionary.GetEnumerator();
-        private bool _valid = false;
+        private bool _valid;
 
         public DictionaryEntry Entry {
             get {
@@ -363,7 +363,7 @@ public class WideOrderedDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>
         }
 
         public void Reset() {
-            ((IEnumerator)_enumerator).Reset();
+            _enumerator.Reset();
             _valid = false;
         }
     }

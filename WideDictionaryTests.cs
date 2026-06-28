@@ -116,7 +116,7 @@ public sealed class WideDictionaryTests {
         dictionary.Compact();
         long after = dictionary.InternalEntriesLength;
 
-        Assert.IsTrue(after < before);
+        Assert.IsLessThan(before, after);
         CollectionAssert.AreEquivalent(new[] { 25, 26, 27, 28, 29 }, dictionary.Keys.OrderBy(x => x).ToArray());
     }
 }

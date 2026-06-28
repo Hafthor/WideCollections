@@ -153,7 +153,7 @@ public sealed class WideSortedSetTests {
         set.Compact();
         long after = set.InternalItemsCapacity;
 
-        Assert.IsTrue(after < before);
+        Assert.IsLessThan(before, after);
         CollectionAssert.AreEqual(new[] { 25, 26, 27, 28, 29 }, set.ToArray());
     }
 }

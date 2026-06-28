@@ -6,21 +6,10 @@ namespace WideCollections;
 public class WideHashSet<T> : IWideSet<T>, IWideReadOnlySet<T>, ICompactable {
     private const long Lower31BitMask = 0x7FFFFFFF;
 
-    private static readonly long[] Primes = [
-        3, 7, 11, 17, 23, 29, 37, 47, 59, 71, 89, 107, 131, 163, 197, 239, 293, 353, 431, 521, 631, 761, 919, 1103,
-        1327, 1597, 1931, 2333, 2801, 3371, 4049, 4861, 5839, 7013, 8419, 10103, 12143, 14591, 17519, 21023, 25229,
-        30293, 36353, 43627, 52361, 62851, 75431, 90523, 108631, 130363, 156437, 187751, 225307, 270371, 324449,
-        389357, 467237, 560689, 672827, 807403, 968897, 1162687, 1395263, 1674319, 2009191, 2411033, 2893249,
-        3471899, 4166287, 4999559, 5999471, 7199369
-    ];
-
     private WideArray<long> _buckets = new();
     private WideArray<Entry> _entries = new();
     private readonly IEqualityComparer<T> _comparer;
-    private long _count;
-    private long _freeList = -1;
-    private long _freeCount;
-    private long _version;
+    private long _count, _freeList = -1, _freeCount, _version;
     private static readonly bool ContainsReferences = RuntimeHelpers.IsReferenceOrContainsReferences<T>();
 
     private struct Entry {
@@ -29,13 +18,9 @@ public class WideHashSet<T> : IWideSet<T>, IWideReadOnlySet<T>, ICompactable {
         public T Value;
     }
 
-    public WideHashSet() : this(0, null) { }
-
     public WideHashSet(IEqualityComparer<T> comparer) : this(0, comparer) { }
 
-    public WideHashSet(long capacity) : this(capacity, null) { }
-
-    public WideHashSet(long capacity, IEqualityComparer<T> comparer) {
+    public WideHashSet(long capacity = 0, IEqualityComparer<T> comparer = null) {
         ArgumentOutOfRangeException.ThrowIfNegative(capacity);
 
         _comparer = comparer ?? EqualityComparer<T>.Default;
@@ -43,9 +28,7 @@ public class WideHashSet<T> : IWideSet<T>, IWideReadOnlySet<T>, ICompactable {
             Initialize(capacity);
     }
 
-    public WideHashSet(IEnumerable<T> collection) : this(collection, null) { }
-
-    public WideHashSet(IEnumerable<T> collection, IEqualityComparer<T> comparer) : this(0, comparer) {
+    public WideHashSet(IEnumerable<T> collection, IEqualityComparer<T> comparer = null) : this(0, comparer) {
         ArgumentNullException.ThrowIfNull(collection);
 
         if (collection is ICollection<T> genericCollection)
@@ -325,7 +308,7 @@ public class WideHashSet<T> : IWideSet<T>, IWideReadOnlySet<T>, ICompactable {
             return;
         }
 
-        long newSize = GetPrime(liveCount);
+        long newSize = PrimeHelper.GetPrime(liveCount);
         WideArray<long> newBuckets = new(newSize);
         WideArray<Entry> newEntries = new(newSize);
 
@@ -394,14 +377,14 @@ public class WideHashSet<T> : IWideSet<T>, IWideReadOnlySet<T>, ICompactable {
     }
 
     private void Initialize(long capacity) {
-        long size = GetPrime(capacity <= 0 ? 3 : capacity);
+        long size = PrimeHelper.GetPrime(capacity <= 0 ? 3 : capacity);
         _buckets = new WideArray<long>(size);
         _entries = new WideArray<Entry>(size);
         _freeList = -1;
     }
 
     private void Resize() {
-        long newSize = GetPrime(_count * 2);
+        long newSize = PrimeHelper.GetPrime(_count * 2);
         WideArray<long> newBuckets = new(newSize);
         WideArray<Entry> newEntries = new(newSize);
 
@@ -426,37 +409,6 @@ public class WideHashSet<T> : IWideSet<T>, IWideReadOnlySet<T>, ICompactable {
             return 0;
 
         return _comparer.GetHashCode(item) & (int)Lower31BitMask;
-    }
-
-    private static long GetPrime(long min) {
-        for (int i = 0; i < Primes.Length; i++) {
-            long prime = Primes[i];
-            if (prime >= min)
-                return prime;
-        }
-
-        if (min <= 2)
-            return 3;
-
-        for (long candidate = (min | 1); candidate < long.MaxValue; candidate += 2) {
-            if (IsPrime(candidate) && ((candidate - 1) % 101 != 0))
-                return candidate;
-        }
-
-        return min;
-    }
-
-    private static bool IsPrime(long candidate) {
-        if ((candidate & 1) == 0)
-            return candidate == 2;
-
-        long limit = (long)Math.Sqrt(candidate);
-        for (long divisor = 3; divisor <= limit; divisor += 2) {
-            if (candidate % divisor == 0)
-                return false;
-        }
-
-        return true;
     }
 
     public struct Enumerator : IEnumerator<T> {

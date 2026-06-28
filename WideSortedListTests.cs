@@ -131,7 +131,7 @@ public sealed class WideSortedListTests {
         for (int i = 0; i < 25; i++)
             list.Remove(i);
 
-        Assert.IsTrue(list.Capacity > list.Count);
+        Assert.IsGreaterThan(list.Count, list.Capacity);
         list.Compact();
 
         Assert.AreEqual(list.Count, list.Capacity);

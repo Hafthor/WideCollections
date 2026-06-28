@@ -11,7 +11,7 @@ public class WideArray<T> : IWideCollection<T>, IWideReadOnlyCollection<T>, IWid
     private const int DefaultSegmentShift = 30; // 2^30 = 1,073,741,824 elements per segment
 
     private T[][] _segments = [];
-    private long _length = 0;
+    private long _length;
     private readonly int _segmentShift;
     private readonly int _segmentSize;
     private readonly int _segmentMask;
@@ -96,11 +96,11 @@ public class WideArray<T> : IWideCollection<T>, IWideReadOnlyCollection<T>, IWid
         if (newLength < _length) {
             // Shrinking - trim segments
             long segmentsNeeded = newLength == 0 ? 0 : (newLength + _segmentSize - 1) >> _segmentShift;
-            System.Array.Resize(ref _segments, (int)segmentsNeeded);
+            Array.Resize(ref _segments, (int)segmentsNeeded);
 
             if (segmentsNeeded > 0) {
                 int lastSegmentSize = (int)(newLength - ((segmentsNeeded - 1) << _segmentShift));
-                System.Array.Resize(ref _segments[segmentsNeeded - 1], lastSegmentSize);
+                Array.Resize(ref _segments[segmentsNeeded - 1], lastSegmentSize);
             }
         } else {
             // Growing - add new segments or expand existing ones
@@ -108,7 +108,7 @@ public class WideArray<T> : IWideCollection<T>, IWideReadOnlyCollection<T>, IWid
             long segmentsNeeded = (newLength + _segmentSize - 1) >> _segmentShift;
 
             if (segmentsNeeded > currentSegments) {
-                System.Array.Resize(ref _segments, (int)segmentsNeeded);
+                Array.Resize(ref _segments, (int)segmentsNeeded);
 
                 for (long i = currentSegments; i < segmentsNeeded; i++) {
                     long segmentStart = i << _segmentShift;
@@ -159,9 +159,9 @@ public class WideArray<T> : IWideCollection<T>, IWideReadOnlyCollection<T>, IWid
     }
 
     public void Clear() {
-        for (int i = 0; i < _segments.Length; i++)
-            if (_segments[i] != null)
-                Array.Clear(_segments[i], 0, _segments[i].Length);
+        foreach (T[] segment in _segments)
+            if (segment != null)
+                Array.Clear(segment, 0, segment.Length);
     }
 
     public bool Contains(T findItem) {
@@ -222,7 +222,7 @@ public class WideArray<T> : IWideCollection<T>, IWideReadOnlyCollection<T>, IWid
     /// Uses segment-aligned Array.Copy when the source is a WideArray or WideList; otherwise falls back to indexing.
     /// </summary>
     internal static void BulkCopyFrom(IWideReadOnlyIndexable<T> source, long sourceIndex, WideArray<T> destination, long destinationIndex, long count) {
-        WideArray<T>? src = source as WideArray<T> ?? (source as WideList<T>)?.Items;
+        WideArray<T> src = source as WideArray<T> ?? (source as WideList<T>)?.Items;
         if (src is not null) {
             BulkCopy(src, sourceIndex, destination, destinationIndex, count);
             return;

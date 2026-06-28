@@ -11,14 +11,12 @@ public class WideBitArray : IWideCollection, ICloneable, ISerializable {
     private const int BitsPerLong = 64;
     private const int BitsPerLongShift = 6; // log2(64)
     private const int BitsPerLongMask = 63; // 2^6 - 1
-    private WideArray<ulong> _data;
-    private long _bitLength = 0;
+    private readonly WideArray<ulong> _data;
+    private long _bitLength;
 
     public long Length => _bitLength;
 
-    public WideBitArray() {
-        _data = new WideArray<ulong>();
-    }
+    public WideBitArray() => _data = new WideArray<ulong>();
 
     public WideBitArray(long bitCapacity) {
         ArgumentOutOfRangeException.ThrowIfNegative(bitCapacity);

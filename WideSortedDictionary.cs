@@ -272,7 +272,7 @@ public class WideSortedDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>,
         }
 
         public void Reset() {
-            ((IEnumerator)_enumerator).Reset();
+            _enumerator.Reset();
             _valid = false;
         }
     }

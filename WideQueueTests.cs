@@ -115,7 +115,7 @@ public sealed class WideQueueTests {
         Assert.AreEqual(0L, queue.Count);
         Assert.IsFalse(queue.Contains("a"));
         Assert.IsFalse(queue.Contains("b"));
-        Assert.Throws<InvalidOperationException>(() => queue.Peek());
+        Assert.Throws<InvalidOperationException>(queue.Peek);
     }
 
     [TestMethod]
@@ -127,7 +127,7 @@ public sealed class WideQueueTests {
         for (int i = 0; i < 17; i++)
             queue.Dequeue();
 
-        Assert.IsTrue(queue.Capacity > queue.Count);
+        Assert.IsGreaterThan(queue.Count, queue.Capacity);
         queue.Compact();
 
         Assert.AreEqual(queue.Count, queue.Capacity);

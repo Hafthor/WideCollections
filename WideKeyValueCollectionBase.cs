@@ -1,19 +1,16 @@
 using System.Collections;
-using System.Collections.Generic;
 
 namespace WideCollections;
 
 /// <summary>
 /// Base class for key/value collection views. Subclasses implement abstract methods to handle
-/// collection-specific element extraction (e.g., filtering deleted entries vs direct indexing).
+/// collection-specific element extraction (e.g., filtering deleted entries vs. direct indexing).
 /// </summary>
-internal abstract class WideKeyValueCollectionBase<T> : IWideCollection<T>, IWideCollection {
+internal abstract class WideKeyValueCollectionBase<T>(object syncRoot) : IWideCollection<T>, IWideCollection {
     public abstract long Count { get; }
+    public object SyncRoot { get; } = syncRoot;
     public bool IsReadOnly => true;
-    public object SyncRoot { get; }
     public bool IsSynchronized => false;
-
-    protected WideKeyValueCollectionBase(object syncRoot) => SyncRoot = syncRoot;
 
     public abstract bool Contains(T item);
     

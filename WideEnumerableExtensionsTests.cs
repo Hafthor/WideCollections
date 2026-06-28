@@ -28,8 +28,8 @@ public sealed class WideEnumerableExtensionsTests {
             list.Add(i);
 
         int[] values = list.AsWide()
-            .WhereWide<int>(x => x % 2 == 0)
-            .SelectWide<int, int>(x => x * 10)
+            .WhereWide(x => x % 2 == 0)
+            .SelectWide(x => x * 10)
             .ToArray();
 
         CollectionAssert.AreEqual(new[] { 0, 20, 40 }, values);
@@ -52,9 +52,17 @@ public sealed class WideEnumerableExtensionsTests {
         list.Add("b");
         list.Add("c");
 
-        Assert.AreEqual("b", list.AsWide().ElementAtLong<string>(1));
-        Assert.Throws<ArgumentOutOfRangeException>(() => list.AsWide().ElementAtLong<string>(-1));
-        Assert.Throws<ArgumentOutOfRangeException>(() => list.AsWide().ElementAtLong<string>(3));
+        Assert.AreEqual("b", list.AsWide().ElementAtLong(1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => list.AsWide().ElementAtLong(-1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => list.AsWide().ElementAtLong(3));
+    }
+
+    [TestMethod]
+    public void ElementAtLong_EnumerationFallback_WorksForNonIndexableSource() {
+        IWideEnumerable<int> wide = new[] { 10, 20, 30 }.AsWide();
+
+        Assert.AreEqual(20, wide.ElementAtLong(1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => wide.ElementAtLong(3));
     }
 
     [TestMethod]
@@ -63,9 +71,9 @@ public sealed class WideEnumerableExtensionsTests {
         for (int i = 1; i <= 6; i++)
             list.Add(i);
 
-        int[] skipped = list.AsWide().SkipLong<int>(3).ToArray();
-        int[] taken = list.AsWide().TakeLong<int>(3).ToArray();
-        int[] chained = list.AsWide().SkipLong<int>(1).TakeLong<int>(3).ToArray();
+        int[] skipped = list.AsWide().SkipLong(3).ToArray();
+        int[] taken = list.AsWide().TakeLong(3).ToArray();
+        int[] chained = list.AsWide().SkipLong(1).TakeLong(3).ToArray();
 
         CollectionAssert.AreEqual(new[] { 4, 5, 6 }, skipped);
         CollectionAssert.AreEqual(new[] { 1, 2, 3 }, taken);
@@ -77,8 +85,8 @@ public sealed class WideEnumerableExtensionsTests {
         WideList<int> list = new();
         list.Add(1);
 
-        Assert.Throws<ArgumentOutOfRangeException>(() => list.AsWide().SkipLong<int>(-1));
-        Assert.Throws<ArgumentOutOfRangeException>(() => list.AsWide().TakeLong<int>(-1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => list.AsWide().SkipLong(-1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => list.AsWide().TakeLong(-1));
     }
 
     [TestMethod]
@@ -89,9 +97,9 @@ public sealed class WideEnumerableExtensionsTests {
         source.Add(2);
         source.Add(1);
 
-        WideList<int> list = source.AsWide().WhereWide<int>(x => x > 1).ToWideList();
-        WideArray<int> array = source.AsWide().WhereWide<int>(x => x > 1).ToWideArray();
-        WideHashSet<int> set = source.AsWide().ToWideHashSet<int>();
+        WideList<int> list = source.AsWide().WhereWide(x => x > 1).ToWideList();
+        WideArray<int> array = source.AsWide().WhereWide(x => x > 1).ToWideArray();
+        WideHashSet<int> set = source.AsWide().ToWideHashSet();
 
         CollectionAssert.AreEqual(new[] { 3, 2 }, list.ToArray());
         CollectionAssert.AreEqual(new[] { 3, 2 }, array.ToArray());

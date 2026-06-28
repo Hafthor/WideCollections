@@ -79,7 +79,7 @@ public sealed class WidePriorityQueueTests {
     public void EnsureCapacityAndTrimExcess_AdjustCapacity() {
         WidePriorityQueue<int, int> queue = new();
         long ensured = queue.EnsureCapacity(50);
-        Assert.IsTrue(ensured >= 50);
+        Assert.IsGreaterThanOrEqualTo(50, ensured);
 
         queue.Enqueue(1, 1);
         queue.Enqueue(2, 2);
@@ -97,7 +97,7 @@ public sealed class WidePriorityQueueTests {
         for (int i = 0; i < 17; i++)
             queue.Dequeue();
 
-        Assert.IsTrue(queue.Capacity > queue.Count);
+        Assert.IsGreaterThan(queue.Count, queue.Capacity);
         queue.Compact();
 
         Assert.AreEqual(queue.Count, queue.Capacity);

@@ -2,9 +2,8 @@ namespace WideCollections;
 
 [TestClass]
 public sealed class WideHashSetTests {
-    private readonly struct RefHolder {
-        public RefHolder(object value) => Value = value;
-        public object Value { get; }
+    private readonly struct RefHolder(object value) {
+        public object Value { get; } = value;
     }
 
     [TestMethod]
@@ -132,7 +131,7 @@ public sealed class WideHashSetTests {
         set.Compact();
         long after = set.InternalEntriesLength;
 
-        Assert.IsTrue(after < before);
+        Assert.IsLessThan(before, after);
         CollectionAssert.AreEquivalent(new[] { 25, 26, 27, 28, 29 }, set.OrderBy(x => x).ToArray());
     }
 

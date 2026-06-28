@@ -89,10 +89,10 @@ public sealed class WideArrayTests {
     public void SmallSegmentShift_AllowsBoundaryTestingAcrossMultipleSegments() {
         WideArray<int> array = new(10, segmentShift: 2); // Segment size = 4
 
-        Assert.AreEqual(3, array.Segments.Length);
-        Assert.AreEqual(4, array.Segments[0].Length);
-        Assert.AreEqual(4, array.Segments[1].Length);
-        Assert.AreEqual(2, array.Segments[2].Length);
+        Assert.HasCount(3, array.Segments);
+        Assert.HasCount(4, array.Segments[0]);
+        Assert.HasCount(4, array.Segments[1]);
+        Assert.HasCount(2, array.Segments[2]);
 
         for (int i = 0; i < 10; i++)
             array[i] = i * 10;
@@ -101,8 +101,8 @@ public sealed class WideArrayTests {
             Assert.AreEqual(i * 10, array[i]);
 
         array.Resize(13);
-        Assert.AreEqual(4, array.Segments.Length);
-        Assert.AreEqual(1, array.Segments[3].Length);
+        Assert.HasCount(4, array.Segments);
+        Assert.HasCount(1, array.Segments[3]);
         Assert.AreEqual(90, array[9]);
     }
 }
