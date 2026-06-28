@@ -2,41 +2,25 @@ using System.Collections;
 
 namespace WideCollections;
 
-public class WideOrderedDictionary<TKey, TValue> : IWideCollection<KeyValuePair<TKey, TValue>>,
-    IWideDictionary<TKey, TValue>,
-    IWideList<KeyValuePair<TKey, TValue>>,
-    IWideReadOnlyCollection<KeyValuePair<TKey, TValue>>,
-    IWideReadOnlyDictionary<TKey, TValue>,
-    IWideReadOnlyList<KeyValuePair<TKey, TValue>>,
-    IWideCollection,
-    IWideDictionary,
-    IWideList,
-    ICompactable
-    where TKey : notnull {
+public class WideOrderedDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>, IWideList<KeyValuePair<TKey, TValue>>,
+    IWideReadOnlyDictionary<TKey, TValue>, IWideReadOnlyList<KeyValuePair<TKey, TValue>>, IWideDictionary, IWideList,
+    ICompactable where TKey : notnull {
     private readonly WideList<KeyValuePair<TKey, TValue>> _items;
     private readonly WideDictionary<TKey, long> _indexByKey;
-    private readonly IEqualityComparer<TKey> _comparer;
     private KeyCollection _keys;
     private ValueCollection _values;
 
-    public WideOrderedDictionary() : this(0, null) { }
-
-    public WideOrderedDictionary(long capacity) : this(capacity, null) { }
-
     public WideOrderedDictionary(IEqualityComparer<TKey> comparer) : this(0, comparer) { }
 
-    public WideOrderedDictionary(long capacity, IEqualityComparer<TKey> comparer) {
+    public WideOrderedDictionary(long capacity = 0, IEqualityComparer<TKey> comparer = null) {
         ArgumentOutOfRangeException.ThrowIfNegative(capacity);
 
         _items = new WideList<KeyValuePair<TKey, TValue>>(capacity);
-        _comparer = comparer ?? EqualityComparer<TKey>.Default;
-        _indexByKey = new WideDictionary<TKey, long>(capacity, _comparer);
-        SyncRoot = new object();
+        Comparer = comparer ?? EqualityComparer<TKey>.Default;
+        _indexByKey = new WideDictionary<TKey, long>(capacity, Comparer);
     }
 
-    public WideOrderedDictionary(IEnumerable<KeyValuePair<TKey, TValue>> collection) : this(collection, null) { }
-
-    public WideOrderedDictionary(IEnumerable<KeyValuePair<TKey, TValue>> collection, IEqualityComparer<TKey> comparer) : this(0, comparer) {
+    public WideOrderedDictionary(IEnumerable<KeyValuePair<TKey, TValue>> collection, IEqualityComparer<TKey> comparer = null) : this(0, comparer) {
         ArgumentNullException.ThrowIfNull(collection);
         foreach (KeyValuePair<TKey, TValue> pair in collection)
             Add(pair.Key, pair.Value);
@@ -45,9 +29,9 @@ public class WideOrderedDictionary<TKey, TValue> : IWideCollection<KeyValuePair<
     public long Count => _items.Count;
     public bool IsReadOnly => false;
     public bool IsFixedSize => false;
-    public object SyncRoot { get; }
+    public object SyncRoot { get; } = new();
     public bool IsSynchronized => false;
-    public IEqualityComparer<TKey> Comparer => _comparer;
+    public IEqualityComparer<TKey> Comparer { get; }
 
     public long Capacity {
         get => _items.Capacity;
@@ -317,7 +301,7 @@ public class WideOrderedDictionary<TKey, TValue> : IWideCollection<KeyValuePair<
     private static void ValidateObjectValue(object value) {
         if (default(TValue) is not null)
             ArgumentNullException.ThrowIfNull(value);
-        if (value is not TValue && (value is not null || default(TValue) is not null))
+        if (value is not TValue && value is not null)
             throw new ArgumentException($"Value must be of type {typeof(TValue)}.", nameof(value));
     }
 
@@ -355,14 +339,9 @@ public class WideOrderedDictionary<TKey, TValue> : IWideCollection<KeyValuePair<
         public void Dispose() { }
     }
 
-    private sealed class DictionaryEnumerator : IDictionaryEnumerator {
-        private Enumerator _enumerator;
-        private bool _valid;
-
-        public DictionaryEnumerator(WideOrderedDictionary<TKey, TValue> dictionary) {
-            _enumerator = dictionary.GetEnumerator();
-            _valid = false;
-        }
+    private sealed class DictionaryEnumerator(WideOrderedDictionary<TKey, TValue> dictionary) : IDictionaryEnumerator {
+        private Enumerator _enumerator = dictionary.GetEnumerator();
+        private bool _valid = false;
 
         public DictionaryEntry Entry {
             get {
@@ -389,71 +368,27 @@ public class WideOrderedDictionary<TKey, TValue> : IWideCollection<KeyValuePair<
         }
     }
 
-    public sealed class KeyCollection : IWideCollection<TKey>, IWideCollection {
+    private sealed class KeyCollection : WideKeyValueCollectionBase<TKey> {
         private readonly WideOrderedDictionary<TKey, TValue> _dictionary;
 
-        internal KeyCollection(WideOrderedDictionary<TKey, TValue> dictionary) => _dictionary = dictionary;
+        internal KeyCollection(WideOrderedDictionary<TKey, TValue> dictionary) : base(dictionary.SyncRoot)
+            => _dictionary = dictionary;
 
-        public long Count => _dictionary.Count;
-        public bool IsReadOnly => true;
-        public object SyncRoot => _dictionary.SyncRoot;
-        public bool IsSynchronized => false;
+        public override long Count => _dictionary.Count;
+        public override bool Contains(TKey item) => _dictionary.ContainsKey(item);
 
-        public bool Contains(TKey item) => _dictionary.ContainsKey(item);
-
-        public void CopyTo(WideArray<TKey> array, long arrayIndex) {
-            ArgumentNullException.ThrowIfNull(array);
-            ArgumentOutOfRangeException.ThrowIfNegative(arrayIndex);
-            ArgumentOutOfRangeException.ThrowIfGreaterThan(arrayIndex, array.Length);
-            ArgumentOutOfRangeException.ThrowIfLessThan(array.Length - arrayIndex, Count);
-
-            for (long i = 0; i < _dictionary.Count; i++)
-                array[arrayIndex + i] = _dictionary._items[i].Key;
-        }
-
-        public void Add(TKey item) => throw new NotSupportedException("Collection is read-only.");
-        public bool Remove(TKey item) => throw new NotSupportedException("Collection is read-only.");
-        public void Clear() => throw new NotSupportedException("Collection is read-only.");
-
-        public IEnumerator<TKey> GetEnumerator() {
-            for (long i = 0; i < _dictionary.Count; i++)
-                yield return _dictionary._items[i].Key;
-        }
-
-        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+        protected override TKey GetElementAt(long index) => _dictionary._items[(int)index].Key;
     }
 
-    public sealed class ValueCollection : IWideCollection<TValue>, IWideCollection {
+    private sealed class ValueCollection : WideKeyValueCollectionBase<TValue> {
         private readonly WideOrderedDictionary<TKey, TValue> _dictionary;
 
-        internal ValueCollection(WideOrderedDictionary<TKey, TValue> dictionary) => _dictionary = dictionary;
+        internal ValueCollection(WideOrderedDictionary<TKey, TValue> dictionary) : base(dictionary.SyncRoot)
+            => _dictionary = dictionary;
 
-        public long Count => _dictionary.Count;
-        public bool IsReadOnly => true;
-        public object SyncRoot => _dictionary.SyncRoot;
-        public bool IsSynchronized => false;
+        public override long Count => _dictionary.Count;
+        public override bool Contains(TValue item) => _dictionary.ContainsValue(item);
 
-        public bool Contains(TValue item) => _dictionary.ContainsValue(item);
-
-        public void CopyTo(WideArray<TValue> array, long arrayIndex) {
-            ArgumentNullException.ThrowIfNull(array);
-            ArgumentOutOfRangeException.ThrowIfNegative(arrayIndex);
-            ArgumentOutOfRangeException.ThrowIfGreaterThan(arrayIndex, array.Length);
-            ArgumentOutOfRangeException.ThrowIfLessThan(array.Length - arrayIndex, Count);
-
-            for (long i = 0; i < _dictionary.Count; i++)
-                array[arrayIndex + i] = _dictionary._items[i].Value;
-        }
-
-        public void Add(TValue item) => throw new NotSupportedException("Collection is read-only.");
-        public bool Remove(TValue item) => throw new NotSupportedException("Collection is read-only.");
-        public void Clear() => throw new NotSupportedException("Collection is read-only.");
-
-        public IEnumerator<TValue> GetEnumerator() {
-            for (long i = 0; i < _dictionary.Count; i++)
-                yield return _dictionary._items[i].Value;
-        }
-
-        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+        protected override TValue GetElementAt(long index) => _dictionary._items[(int)index].Value;
     }
 }

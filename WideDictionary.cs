@@ -41,7 +41,6 @@ public class WideDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
         ArgumentOutOfRangeException.ThrowIfNegative(capacity);
 
         _comparer = comparer ?? EqualityComparer<TKey>.Default;
-        SyncRoot = new object();
 
         if (capacity > 0)
             Initialize(capacity);
@@ -62,7 +61,7 @@ public class WideDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
     public long Count => _count - _freeCount;
     public bool IsReadOnly => false;
     public bool IsFixedSize => false;
-    public object SyncRoot { get; }
+    public object SyncRoot { get; } = new();
     public bool IsSynchronized => false;
     internal long InternalEntriesLength => _entries.Length;
 
@@ -366,7 +365,7 @@ public class WideDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
         if (default(TValue) is not null)
             ArgumentNullException.ThrowIfNull(value);
 
-        if (value is not TValue && (value is not null || default(TValue) is not null))
+        if (value is not TValue && value is not null)
             throw new ArgumentException($"Value must be of type {typeof(TValue)}.", nameof(value));
     }
 
@@ -506,18 +505,29 @@ public class WideDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
         }
     }
 
-    public sealed class KeyCollection : IWideCollection<TKey>, IWideCollection {
+    internal sealed class KeyCollection : WideKeyValueCollectionBase<TKey> {
         private readonly WideDictionary<TKey, TValue> _dictionary;
 
-        internal KeyCollection(WideDictionary<TKey, TValue> dictionary) => _dictionary = dictionary;
+        internal KeyCollection(WideDictionary<TKey, TValue> dictionary) : base(dictionary.SyncRoot) 
+            => _dictionary = dictionary;
 
-        public long Count => _dictionary.Count;
-        public bool IsReadOnly => true;
-        public object SyncRoot => _dictionary.SyncRoot;
-        public bool IsSynchronized => false;
+        public override long Count => _dictionary.Count;
+        public override bool Contains(TKey item) => _dictionary.ContainsKey(item);
 
-        public bool Contains(TKey item) => _dictionary.ContainsKey(item);
-        public void CopyTo(WideArray<TKey> array, long arrayIndex) {
+        protected override TKey GetElementAt(long index) {
+            long copied = 0;
+            for (long i = 0; i < _dictionary._count; i++) {
+                Entry entry = _dictionary._entries[i];
+                if (entry.HashCode >= 0) {
+                    if (copied == index)
+                        return entry.Key;
+                    copied++;
+                }
+            }
+            throw new IndexOutOfRangeException();
+        }
+
+        public override void CopyTo(WideArray<TKey> array, long arrayIndex) {
             ArgumentNullException.ThrowIfNull(array);
             ArgumentOutOfRangeException.ThrowIfNegative(arrayIndex);
             ArgumentOutOfRangeException.ThrowIfGreaterThan(arrayIndex, array.Length);
@@ -533,43 +543,46 @@ public class WideDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
             }
         }
 
-        public void Add(TKey item) => throw new NotSupportedException("Collection is read-only.");
-        public bool Remove(TKey item) => throw new NotSupportedException("Collection is read-only.");
-        public void Clear() => throw new NotSupportedException("Collection is read-only.");
-
-        public IEnumerator<TKey> GetEnumerator() {
+        public override IEnumerator<TKey> GetEnumerator() {
             for (long i = 0; i < _dictionary._count; i++) {
                 Entry entry = _dictionary._entries[i];
                 if (entry.HashCode >= 0)
                     yield return entry.Key;
             }
         }
-
-        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
 
-    public sealed class ValueCollection : IWideCollection<TValue>, IWideCollection {
+    internal sealed class ValueCollection : WideKeyValueCollectionBase<TValue> {
         private readonly WideDictionary<TKey, TValue> _dictionary;
 
-        internal ValueCollection(WideDictionary<TKey, TValue> dictionary) => _dictionary = dictionary;
+        internal ValueCollection(WideDictionary<TKey, TValue> dictionary) : base(dictionary.SyncRoot) 
+            => _dictionary = dictionary;
 
-        public long Count => _dictionary.Count;
-        public bool IsReadOnly => true;
-        public object SyncRoot => _dictionary.SyncRoot;
-        public bool IsSynchronized => false;
-
-        public bool Contains(TValue item) {
+        public override long Count => _dictionary.Count;
+        public override bool Contains(TValue item) {
             var comparer = EqualityComparer<TValue>.Default;
             for (long i = 0; i < _dictionary._count; i++) {
                 Entry entry = _dictionary._entries[i];
                 if (entry.HashCode >= 0 && comparer.Equals(entry.Value, item))
                     return true;
             }
-
             return false;
         }
 
-        public void CopyTo(WideArray<TValue> array, long arrayIndex) {
+        protected override TValue GetElementAt(long index) {
+            long copied = 0;
+            for (long i = 0; i < _dictionary._count; i++) {
+                Entry entry = _dictionary._entries[i];
+                if (entry.HashCode >= 0) {
+                    if (copied == index)
+                        return entry.Value;
+                    copied++;
+                }
+            }
+            throw new IndexOutOfRangeException();
+        }
+
+        public override void CopyTo(WideArray<TValue> array, long arrayIndex) {
             ArgumentNullException.ThrowIfNull(array);
             ArgumentOutOfRangeException.ThrowIfNegative(arrayIndex);
             ArgumentOutOfRangeException.ThrowIfGreaterThan(arrayIndex, array.Length);
@@ -585,18 +598,12 @@ public class WideDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
             }
         }
 
-        public void Add(TValue item) => throw new NotSupportedException("Collection is read-only.");
-        public bool Remove(TValue item) => throw new NotSupportedException("Collection is read-only.");
-        public void Clear() => throw new NotSupportedException("Collection is read-only.");
-
-        public IEnumerator<TValue> GetEnumerator() {
+        public override IEnumerator<TValue> GetEnumerator() {
             for (long i = 0; i < _dictionary._count; i++) {
                 Entry entry = _dictionary._entries[i];
                 if (entry.HashCode >= 0)
                     yield return entry.Value;
             }
         }
-
-        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
 }

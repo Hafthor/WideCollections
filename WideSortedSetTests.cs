@@ -88,6 +88,43 @@ public sealed class WideSortedSetTests {
     }
 
     [TestMethod]
+    public void GetViewMemoryBetween_ReturnsExpectedRange() {
+        WideSortedSet<int> set = new([1, 2, 3, 4, 5]);
+
+        WideMemory<int> memory = set.GetViewMemoryBetween(2, 4);
+
+        Assert.AreEqual(3, memory.Length);
+        CollectionAssert.AreEqual(new[] { 2, 3, 4 }, new List<int>(memory));
+    }
+
+    [TestMethod]
+    public void GetViewMemoryBetween_FullRange_ReturnsAllItems() {
+        WideSortedSet<int> set = new([1, 2, 3, 4, 5]);
+
+        WideMemory<int> memory = set.GetViewMemoryBetween(1, 5);
+
+        Assert.AreEqual(5, memory.Length);
+        CollectionAssert.AreEqual(new[] { 1, 2, 3, 4, 5 }, new List<int>(memory));
+    }
+
+    [TestMethod]
+    public void GetViewMemoryBetween_ReflectsUnderlyingMutations() {
+        WideSortedSet<int> set = new([1, 2, 3, 4, 5]);
+
+        WideMemory<int> memory = set.GetViewMemoryBetween(2, 4);
+        memory[0] = 99;
+
+        Assert.AreEqual(99, memory[0]);
+    }
+
+    [TestMethod]
+    public void GetViewMemoryBetween_LowerGreaterThanUpper_Throws() {
+        WideSortedSet<int> set = new([1, 2, 3, 4, 5]);
+
+        Assert.Throws<ArgumentException>(() => set.GetViewMemoryBetween(4, 2));
+    }
+
+    [TestMethod]
     public void ArrayCopyOverloads_CopyAsExpected() {
         WideSortedSet<int> set = new([3, 1, 2]);
         int[] all = new int[3];

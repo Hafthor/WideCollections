@@ -4,17 +4,15 @@ namespace WideCollections;
 
 public class WideSortedSet<T> : IWideSet<T>, IWideCollection, IWideReadOnlySet<T>, ICompactable {
     private readonly WideList<T> _items;
-    private readonly IComparer<T> _comparer;
 
-    public WideSortedSet() : this((IComparer<T>)null) { }
+    public WideSortedSet() : this(Comparer<T>.Default) { }
 
     public WideSortedSet(IComparer<T> comparer) {
         _items = new WideList<T>();
-        _comparer = comparer ?? Comparer<T>.Default;
-        SyncRoot = new object();
+        Comparer = comparer ?? Comparer<T>.Default;
     }
 
-    public WideSortedSet(IEnumerable<T> collection) : this(collection, null) { }
+    public WideSortedSet(IEnumerable<T> collection) : this(collection, Comparer<T>.Default) { }
 
     public WideSortedSet(IEnumerable<T> collection, IComparer<T> comparer) : this(comparer) {
         ArgumentNullException.ThrowIfNull(collection);
@@ -23,9 +21,10 @@ public class WideSortedSet<T> : IWideSet<T>, IWideCollection, IWideReadOnlySet<T
 
     public long Count => _items.Count;
     public bool IsReadOnly => false;
-    public object SyncRoot { get; }
+    public object SyncRoot { get; } = new();
     public bool IsSynchronized => false;
-    public IComparer<T> Comparer => _comparer;
+    public IComparer<T> Comparer { get; }
+
     public T Min => Count == 0 ? default! : _items[0];
     public T Max => Count == 0 ? default! : _items[Count - 1];
     internal long InternalItemsCapacity => _items.Capacity;
@@ -93,20 +92,26 @@ public class WideSortedSet<T> : IWideSet<T>, IWideCollection, IWideReadOnlySet<T
     }
 
     public WideSortedSet<T> GetViewBetween(T lowerValue, T upperValue) {
-        if (_comparer.Compare(lowerValue, upperValue) > 0)
-            throw new ArgumentException("Lower value must be less than or equal to upper value.");
+        WideMemory<T> viewMemory = GetViewMemoryBetween(lowerValue, upperValue);
 
-        WideSortedSet<T> view = new(_comparer);
-        for (long i = 0; i < Count; i++) {
-            T item = _items[i];
-            if (_comparer.Compare(item, lowerValue) < 0)
-                continue;
-            if (_comparer.Compare(item, upperValue) > 0)
-                break;
-            view.Add(item);
-        }
+        WideSortedSet<T> view = new(Comparer);
+        foreach (T item in viewMemory)
+            view._items.Add(item);
 
         return view;
+    }
+    
+    public WideMemory<T> GetViewMemoryBetween(T lowerValue, T upperValue) {
+        if (Comparer.Compare(lowerValue, upperValue) > 0)
+            throw new ArgumentException("Lower value must be less than or equal to upper value.");
+
+        long lowerIndex = FindIndex(lowerValue), upperIndex = FindIndex(upperValue);
+        if (lowerIndex < 0)
+            lowerIndex = ~lowerIndex;
+        if (upperIndex < 0)
+            upperIndex = ~upperIndex;
+
+        return _items.AsMemory(lowerIndex, upperIndex - lowerIndex + 1);
     }
 
     public IEnumerable<T> Reverse() {
@@ -149,7 +154,7 @@ public class WideSortedSet<T> : IWideSet<T>, IWideCollection, IWideReadOnlySet<T
     public void IntersectWith(IEnumerable<T> other) {
         ArgumentNullException.ThrowIfNull(other);
 
-        HashSet<T> otherSet = new(other, new ComparerEqualityAdapter<T>(_comparer));
+        HashSet<T> otherSet = new(other, new ComparerEqualityAdapter<T>(Comparer));
         for (long i = Count - 1; i >= 0; i--) {
             if (!otherSet.Contains(_items[i]))
                 _items.RemoveAt(i);
@@ -165,7 +170,7 @@ public class WideSortedSet<T> : IWideSet<T>, IWideCollection, IWideReadOnlySet<T
     public void SymmetricExceptWith(IEnumerable<T> other) {
         ArgumentNullException.ThrowIfNull(other);
 
-        HashSet<T> unique = new(other, new ComparerEqualityAdapter<T>(_comparer));
+        HashSet<T> unique = new(other, new ComparerEqualityAdapter<T>(Comparer));
         foreach (T item in unique) {
             if (!Remove(item))
                 Add(item);
@@ -174,7 +179,7 @@ public class WideSortedSet<T> : IWideSet<T>, IWideCollection, IWideReadOnlySet<T
 
     public bool IsSubsetOf(IEnumerable<T> other) {
         ArgumentNullException.ThrowIfNull(other);
-        HashSet<T> set = new(other, new ComparerEqualityAdapter<T>(_comparer));
+        HashSet<T> set = new(other, new ComparerEqualityAdapter<T>(Comparer));
         for (long i = 0; i < Count; i++) {
             if (!set.Contains(_items[i]))
                 return false;
@@ -195,7 +200,7 @@ public class WideSortedSet<T> : IWideSet<T>, IWideCollection, IWideReadOnlySet<T
 
     public bool IsProperSupersetOf(IEnumerable<T> other) {
         ArgumentNullException.ThrowIfNull(other);
-        HashSet<T> set = new(other, new ComparerEqualityAdapter<T>(_comparer));
+        HashSet<T> set = new(other, new ComparerEqualityAdapter<T>(Comparer));
         if (Count <= set.Count)
             return false;
         foreach (T item in set) {
@@ -208,7 +213,7 @@ public class WideSortedSet<T> : IWideSet<T>, IWideCollection, IWideReadOnlySet<T
 
     public bool IsProperSubsetOf(IEnumerable<T> other) {
         ArgumentNullException.ThrowIfNull(other);
-        HashSet<T> set = new(other, new ComparerEqualityAdapter<T>(_comparer));
+        HashSet<T> set = new(other, new ComparerEqualityAdapter<T>(Comparer));
         if (Count >= set.Count)
             return false;
         for (long i = 0; i < Count; i++) {
@@ -231,7 +236,7 @@ public class WideSortedSet<T> : IWideSet<T>, IWideCollection, IWideReadOnlySet<T
 
     public bool SetEquals(IEnumerable<T> other) {
         ArgumentNullException.ThrowIfNull(other);
-        HashSet<T> set = new(other, new ComparerEqualityAdapter<T>(_comparer));
+        HashSet<T> set = new(other, new ComparerEqualityAdapter<T>(Comparer));
         if (set.Count != Count)
             return false;
         for (long i = 0; i < Count; i++) {
@@ -251,7 +256,7 @@ public class WideSortedSet<T> : IWideSet<T>, IWideCollection, IWideReadOnlySet<T
         long hi = Count - 1;
         while (lo <= hi) {
             long mid = lo + ((hi - lo) >> 1);
-            int cmp = _comparer.Compare(_items[mid], item);
+            int cmp = Comparer.Compare(_items[mid], item);
             if (cmp == 0)
                 return mid;
             if (cmp < 0)

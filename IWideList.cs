@@ -1,6 +1,6 @@
 namespace WideCollections;
 
-public interface IWideList<T> : IWideCollection<T> {
+public interface IWideList<T> : IWideCollection<T>, IWideEnumerable<T> {
     T this[long index] { get; set; }
     long IndexOf(T item);
     void Insert(long index, T item);

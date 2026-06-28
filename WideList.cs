@@ -6,60 +6,53 @@ namespace WideCollections;
 /// <summary>
 /// A generic list backed by WideArray that can grow beyond Array.MaxLength.
 /// </summary>
-public class WideList<T> : IWideList<T>, IWideList, IWideReadOnlyList<T>, ICompactable {
-    private WideArray<T> _items;
-    private long _count = 0;
+public class WideList<T> : IWideList<T>, IWideList, IWideReadOnlyList<T>, IWideIndexable<T>, ICompactable {
+    private long _count;
     private static readonly bool ContainsReferences = RuntimeHelpers.IsReferenceOrContainsReferences<T>();
 
     public long Count => _count;
-    public object SyncRoot { get; }
+    public object SyncRoot { get; } = new();
     public bool IsSynchronized => false;
     public bool IsReadOnly => false;
     public bool IsFixedSize => false;
-    public long IndexOf(object value) {
-        throw new NotImplementedException();
-    }
-    public void Insert(long index, object value) {
-        throw new NotImplementedException();
-    }
-    public void Remove(object value) {
-        throw new NotImplementedException();
-    }
+    internal WideArray<T> Items { get; }
+
+    public long IndexOf(object value) => throw new NotImplementedException();
+
+    public void Insert(long index, object value) => throw new NotImplementedException();
+
+    public void Remove(object value) => throw new NotImplementedException();
 
     public long Capacity {
-        get => _items.Length;
+        get => Items.Length;
         set {
             ArgumentOutOfRangeException.ThrowIfLessThan(value, _count);
 
-            if (value != _items.Length)
-                _items.Resize(value);
+            if (value != Items.Length)
+                Items.Resize(value);
         }
     }
 
-    public WideList() {
-        _items = new WideArray<T>();
-        SyncRoot = new object();
-    }
+    public WideList() => Items = new();
 
     public WideList(long capacity) {
         ArgumentOutOfRangeException.ThrowIfNegative(capacity);
 
-        _items = new WideArray<T>(capacity);
-        SyncRoot = new object();
+        Items = new WideArray<T>(capacity);
     }
 
     public T Get(long index) {
         if (index < 0 || index >= _count)
             throw new IndexOutOfRangeException($"Index {index} is out of range for WideList of count {_count}.");
 
-        return _items[index];
+        return Items[index];
     }
 
     public void Set(long index, T value) {
         if (index < 0 || index >= _count)
             throw new IndexOutOfRangeException($"Index {index} is out of range for WideList of count {_count}.");
 
-        _items[index] = value;
+        Items[index] = value;
     }
 
     public T this[long index] {
@@ -68,10 +61,10 @@ public class WideList<T> : IWideList<T>, IWideList, IWideReadOnlyList<T>, ICompa
     }
 
     public void Add(T item) {
-        if (_count >= _items.Length)
+        if (_count >= Items.Length)
             EnsureCapacity(_count + 1);
 
-        _items[_count] = item;
+        Items[_count] = item;
         _count++;
     }
 
@@ -79,14 +72,14 @@ public class WideList<T> : IWideList<T>, IWideList, IWideReadOnlyList<T>, ICompa
         ArgumentOutOfRangeException.ThrowIfNegative(index);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(index, _count);
 
-        if (_count >= _items.Length)
+        if (_count >= Items.Length)
             EnsureCapacity(_count + 1);
 
         // Shift elements to the right
         for (long i = _count; i > index; i--)
-            _items[i] = _items[i - 1];
+            Items[i] = Items[i - 1];
 
-        _items[index] = item;
+        Items[index] = item;
         _count++;
     }
 
@@ -96,11 +89,11 @@ public class WideList<T> : IWideList<T>, IWideList, IWideReadOnlyList<T>, ICompa
 
         // Shift elements to the left
         for (long i = index; i < _count - 1; i++)
-            _items[i] = _items[i + 1];
+            Items[i] = Items[i + 1];
 
         _count--;
         if (ContainsReferences)
-            _items[_count] = default!;
+            Items[_count] = default!;
     }
 
     public void CopyTo(WideArray<T> array, long arrayIndex) {
@@ -111,7 +104,7 @@ public class WideList<T> : IWideList<T>, IWideList, IWideReadOnlyList<T>, ICompa
         ArgumentOutOfRangeException.ThrowIfGreaterThan(arrayIndex, array.Length - _count);
 
         for (long i = 0; i < _count; i++)
-            array[arrayIndex + i] = _items[i];
+            array[arrayIndex + i] = Items[i];
     }
 
     public bool Remove(T item) {
@@ -125,10 +118,9 @@ public class WideList<T> : IWideList<T>, IWideList, IWideReadOnlyList<T>, ICompa
 
     public long IndexOf(T item) {
         var comparer = EqualityComparer<T>.Default;
-        for (long i = 0; i < _count; i++) {
-            if (comparer.Equals(_items[i], item))
+        for (long i = 0; i < _count; i++)
+            if (comparer.Equals(Items[i], item))
                 return i;
-        }
 
         return -1;
     }
@@ -152,7 +144,7 @@ public class WideList<T> : IWideList<T>, IWideList, IWideReadOnlyList<T>, ICompa
             // Clear references for reference types
             if (ContainsReferences)
                 for (long i = 0; i < _count; i++)
-                    _items[i] = default!;
+                    Items[i] = default!;
 
             _count = 0;
         }
@@ -160,8 +152,13 @@ public class WideList<T> : IWideList<T>, IWideList, IWideReadOnlyList<T>, ICompa
 
     public void Compact() => Capacity = _count;
 
+    public WideMemory<T> AsMemory() => new(this);
+    public WideMemory<T> AsMemory(long start, long length) => new WideMemory<T>(this).Slice(start, length);
+    public WideReadOnlyMemory<T> AsReadOnlyMemory() => new(this);
+    public WideReadOnlyMemory<T> AsReadOnlyMemory(long start, long length) => new WideReadOnlyMemory<T>(this).Slice(start, length);
+
     private void EnsureCapacity(long min) {
-        long newCapacity = _items.Length == 0 ? 4 : _items.Length;
+        long newCapacity = Items.Length == 0 ? 4 : Items.Length;
 
         while (newCapacity < min) {
             long growth = newCapacity >> 1;
@@ -186,7 +183,7 @@ public class WideList<T> : IWideList<T>, IWideList, IWideReadOnlyList<T>, ICompa
 
         while (left <= right) {
             long mid = left + ((right - left) >> 1);
-            int cmp = comparer.Compare(_items[mid], item);
+            int cmp = comparer.Compare(Items[mid], item);
 
             if (cmp == 0)
                 return mid;
@@ -212,7 +209,7 @@ public class WideList<T> : IWideList<T>, IWideList, IWideReadOnlyList<T>, ICompa
 
         while (left <= right) {
             long mid = left + ((right - left) >> 1);
-            int cmp = comparer.Compare(_items[mid], item);
+            int cmp = comparer.Compare(Items[mid], item);
 
             if (cmp == 0)
                 return mid;
@@ -227,7 +224,7 @@ public class WideList<T> : IWideList<T>, IWideList, IWideReadOnlyList<T>, ICompa
 
     public IEnumerator<T> GetEnumerator() {
         for (long i = 0; i < _count; i++)
-            yield return _items[i];
+            yield return Items[i];
     }
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();

@@ -7,7 +7,7 @@ namespace WideCollections;
 /// A generic array that can hold more elements than Array.MaxLength by using a jagged array structure.
 /// Uses 2^30 sized segments with bitwise operations for fast indexing.
 /// </summary>
-public class WideArray<T> : IWideCollection<T>, IWideReadOnlyCollection<T> {
+public class WideArray<T> : IWideCollection<T>, IWideReadOnlyCollection<T>, IWideIndexable<T>, ICloneable {
     private const int DefaultSegmentShift = 30; // 2^30 = 1,073,741,824 elements per segment
 
     private T[][] _segments = [];
@@ -140,6 +140,8 @@ public class WideArray<T> : IWideCollection<T>, IWideReadOnlyCollection<T> {
         offset = (int)(index & _segmentMask);
     }
 
+    internal int SegmentShift => _segmentShift;
+
     /// <summary>
     /// Atomically compares and exchanges a value at the given index.
     /// Returns the original value at the index.
@@ -183,10 +185,28 @@ public class WideArray<T> : IWideCollection<T>, IWideReadOnlyCollection<T> {
     
     public bool Remove(T item) => throw new NotImplementedException();
 
-    public IEnumerator<T> GetEnumerator() {
+    public void Fill(T value) {
         foreach (T[] segment in _segments)
-            foreach (T item in segment)
-                yield return item;
+            Array.Fill(segment, value);
+    }
+
+    public WideMemory<T> AsMemory() => new WideMemory<T>(this);
+    public WideMemory<T> AsMemory(long start, long length) => new WideMemory<T>(this).Slice(start, length);
+    public WideReadOnlyMemory<T> AsReadOnlyMemory() => new WideReadOnlyMemory<T>(this);
+    public WideReadOnlyMemory<T> AsReadOnlyMemory(long start, long length) => new WideReadOnlyMemory<T>(this).Slice(start, length);
+
+    public object Clone() {
+        WideArray<T> clone = new(0, _segmentShift);
+        clone.Resize(_length);
+        for (int i = 0; i < _segments.Length; i++)
+            Array.Copy(_segments[i], clone._segments[i], _segments[i].Length);
+        return clone;
+    }
+
+    public IEnumerator<T> GetEnumerator() {
+       foreach (T[] segment in _segments)
+           foreach (T item in segment)
+               yield return item;
     }
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();

@@ -3,26 +3,15 @@ using System.Runtime.CompilerServices;
 
 namespace WideCollections;
 
-public class WideQueue<T> : IEnumerable<T>,
-    IWideCollection,
-    IWideReadOnlyCollection<T>,
-    ICompactable {
+public class WideQueue<T> : IWideCollection, IWideReadOnlyCollection<T>, ICompactable {
     private WideArray<T> _items;
-    private long _head;
-    private long _tail;
-    private long _count;
+    private long _head, _tail, _count;
     private static readonly bool ContainsReferences = RuntimeHelpers.IsReferenceOrContainsReferences<T>();
 
-    public WideQueue() {
-        _items = new WideArray<T>();
-        SyncRoot = new object();
-    }
-
-    public WideQueue(long capacity) {
+    public WideQueue(long capacity = 0) {
         ArgumentOutOfRangeException.ThrowIfNegative(capacity);
 
         _items = new WideArray<T>(capacity);
-        SyncRoot = new object();
     }
 
     public WideQueue(IEnumerable<T> collection) : this() {
@@ -33,7 +22,7 @@ public class WideQueue<T> : IEnumerable<T>,
     }
 
     public long Count => _count;
-    public object SyncRoot { get; }
+    public object SyncRoot { get; } = new();
     public bool IsSynchronized => false;
 
     public long Capacity {
@@ -50,8 +39,7 @@ public class WideQueue<T> : IEnumerable<T>,
         if (_count == _items.Length)
             EnsureCapacity(_count + 1);
 
-        _items[_tail] = item;
-        _tail++;
+        _items[_tail++] = item;
         if (_tail == _items.Length)
             _tail = 0;
 
@@ -67,15 +55,11 @@ public class WideQueue<T> : IEnumerable<T>,
         if (ContainsReferences)
             _items[_head] = default!;
 
-        _head++;
-        if (_head == _items.Length)
+        if (++_head == _items.Length)
             _head = 0;
 
-        _count--;
-        if (_count == 0) {
-            _head = 0;
-            _tail = 0;
-        }
+        if (--_count == 0)
+            _head = _tail = 0;
 
         return item;
     }
@@ -111,24 +95,19 @@ public class WideQueue<T> : IEnumerable<T>,
         if (_count == 0)
             return;
 
-        if (ContainsReferences) {
-            for (long i = 0; i < _count; i++)
-                _items[GetIndex(i)] = default!;
-        }
+        if (ContainsReferences)
+            _items.Fill(default!);
 
-        _count = 0;
-        _head = 0;
-        _tail = 0;
+        _count = _head = _tail = 0;
     }
 
     public void Compact() => SetCapacity(_count);
 
     public bool Contains(T item) {
         var comparer = EqualityComparer<T>.Default;
-        for (long i = 0; i < _count; i++) {
+        for (long i = 0; i < _count; i++)
             if (comparer.Equals(_items[GetIndex(i)], item))
                 return true;
-        }
 
         return false;
     }
