@@ -158,7 +158,7 @@ public sealed class WidePriorityQueueTests {
         int prev = int.MinValue;
         while (pq.Count > 0) {
             Assert.IsTrue(pq.TryDequeue(out _, out int p));
-            Assert.IsTrue(p >= prev, "heap order violated");
+            Assert.IsGreaterThanOrEqualTo(prev, p, "heap order violated");
             prev = p;
         }
     }
