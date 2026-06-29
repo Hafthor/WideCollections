@@ -8,28 +8,30 @@ public static class WideEnumerableExtensions {
         return source as IWideEnumerable<T> ?? new WideEnumerableAdapter<T>(source);
     }
 
-    public static IWideEnumerable<T> WhereWide<T>(this IWideEnumerable<T> source, Func<T, bool> predicate) {
+    public static IWideEnumerable<T> WhereWide<T>(this IWideEnumerable<T> source, Func<T, long, bool> predicate) {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(predicate);
         return Iterator().AsWide();
 
         IEnumerable<T> Iterator() {
+            long index = 0;
             foreach (T item in source)
-                if (predicate(item))
+                if (predicate(item, index++))
                     yield return item;
         }
     }
 
     public static IWideEnumerable<TResult> SelectWide<TSource, TResult>(
         this IWideEnumerable<TSource> source,
-        Func<TSource, TResult> selector) {
+        Func<TSource, long, TResult> selector) {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(selector);
         return Iterator().AsWide();
 
         IEnumerable<TResult> Iterator() {
+            long index = 0;
             foreach (TSource item in source)
-                yield return selector(item);
+                yield return selector(item, index++);
         }
     }
 
@@ -45,17 +47,6 @@ public static class WideEnumerableExtensions {
         long count = 0;
         foreach (T _ in source)
             count++;
-        return count;
-    }
-
-    public static long LongCount<T>(this IWideEnumerable<T> source, Func<T, bool> predicate) {
-        ArgumentNullException.ThrowIfNull(source);
-        ArgumentNullException.ThrowIfNull(predicate);
-
-        long count = 0;
-        foreach (T item in source)
-            if (predicate(item))
-                count++;
         return count;
     }
 
@@ -105,20 +96,6 @@ public static class WideEnumerableExtensions {
                     break;
                 yield return item;
             }
-        }
-    }
-
-    public static IWideEnumerable<TResult> SelectManyWide<TSource, TResult>(
-        this IWideEnumerable<TSource> source,
-        Func<TSource, IEnumerable<TResult>> selector) {
-        ArgumentNullException.ThrowIfNull(source);
-        ArgumentNullException.ThrowIfNull(selector);
-        return Iterator().AsWide();
-
-        IEnumerable<TResult> Iterator() {
-            foreach (TSource item in source)
-                foreach (TResult result in selector(item))
-                    yield return result;
         }
     }
 

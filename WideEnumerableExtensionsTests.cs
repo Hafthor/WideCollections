@@ -28,11 +28,30 @@ public sealed class WideEnumerableExtensionsTests {
             list.Add(i);
 
         int[] values = list.AsWide()
-            .WhereWide(x => x % 2 == 0)
-            .SelectWide(x => x * 10)
+            .WhereWide((x, _) => x % 2 == 0)
+            .SelectWide((x, _) => x * 10)
             .ToArray();
 
         CollectionAssert.AreEqual(new[] { 0, 20, 40 }, values);
+    }
+
+    [TestMethod]
+    public void WhereAndSelectWide_IndexedOverloads_ProvideSequentialIndices() {
+        WideList<string> list = new();
+        list.Add("a");
+        list.Add("b");
+        list.Add("c");
+        list.Add("d");
+
+        string[] whereResult = list.AsWide()
+            .WhereWide((_, index) => index % 2 == 0)
+            .ToArray();
+        string[] selectResult = list.AsWide()
+            .SelectWide((item, index) => $"{index}:{item}")
+            .ToArray();
+
+        CollectionAssert.AreEqual(new[] { "a", "c" }, whereResult);
+        CollectionAssert.AreEqual(new[] { "0:a", "1:b", "2:c", "3:d" }, selectResult);
     }
 
     [TestMethod]
@@ -97,8 +116,8 @@ public sealed class WideEnumerableExtensionsTests {
         source.Add(2);
         source.Add(1);
 
-        WideList<int> list = source.AsWide().WhereWide(x => x > 1).ToWideList();
-        WideArray<int> array = source.AsWide().WhereWide(x => x > 1).ToWideArray();
+        WideList<int> list = source.AsWide().WhereWide((x, _) => x > 1).ToWideList();
+        WideArray<int> array = source.AsWide().WhereWide((x, _) => x > 1).ToWideArray();
         WideHashSet<int> set = source.AsWide().ToWideHashSet();
 
         CollectionAssert.AreEqual(new[] { 3, 2 }, list.ToArray());
@@ -125,5 +144,27 @@ public sealed class WideEnumerableExtensionsTests {
         WideList<int> list = new();
         Assert.Throws<ArgumentNullException>(() => list.AsWide().ForEachWide(null));
         Assert.Throws<ArgumentNullException>(() => WideEnumerableExtensions.ForEachWide<int>(null, (_, _) => { }));
+    }
+
+    [TestMethod]
+    public void DistinctWide_RemovesDuplicates() {
+        WideList<int> list = new();
+        foreach (int x in new[] { 1, 2, 2, 3, 1, 3, 4 })
+            list.Add(x);
+
+        WideList<int> result = list.AsWide().DistinctWide().ToWideList();
+
+        CollectionAssert.AreEqual(new[] { 1, 2, 3, 4 }, result.ToArray());
+    }
+
+    [TestMethod]
+    public void DistinctWide_HonorsCustomComparer() {
+        WideList<string> list = new();
+        foreach (string s in new[] { "a", "A", "b", "B", "a" })
+            list.Add(s);
+
+        string[] result = list.AsWide().DistinctWide(StringComparer.OrdinalIgnoreCase).ToArray();
+
+        CollectionAssert.AreEqual(new[] { "a", "b" }, result);
     }
 }
