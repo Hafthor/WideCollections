@@ -173,6 +173,21 @@ public static class WideEnumerableExtensions {
         return set;
     }
 
+    public static void ForEach<T>(this IWideEnumerable<T> source, Action<T> action) {
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(action);
+        foreach (T item in source)
+            action(item);
+    }
+
+    public static void ForEach<T>(this IWideEnumerable<T> source, Action<T, long> action) {
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(action);
+        long index = 0;
+        foreach (T item in source)
+            action(item, index++);
+    }
+
     private sealed class WideEnumerableAdapter<T>(IEnumerable<T> source) : IWideEnumerable<T> {
         public IEnumerable<T> Source => source;
 
