@@ -108,34 +108,21 @@ public sealed class WideEnumerableExtensionsTests {
     }
 
     [TestMethod]
-    public void ForEach_InvokesActionForEachItem() {
-        WideList<int> list = new();
-        for (int i = 1; i <= 4; i++)
-            list.Add(i);
-
-        List<int> seen = [];
-        list.AsWide().ForEach(seen.Add);
-
-        CollectionAssert.AreEqual(new[] { 1, 2, 3, 4 }, seen);
-    }
-
-    [TestMethod]
-    public void ForEach_WithIndex_ProvidesSequentialIndices() {
+    public void ForEachWide_WithIndex_ProvidesSequentialIndices() {
         WideList<string> list = new();
         list.Add("a");
         list.Add("b");
         list.Add("c");
 
         List<string> seen = [];
-        list.AsWide().ForEach((item, index) => seen.Add($"{index}:{item}"));
+        list.AsWide().ForEachWide((item, index) => seen.Add($"{index}:{item}"));
 
         CollectionAssert.AreEqual(new[] { "0:a", "1:b", "2:c" }, seen);
     }
 
     [TestMethod]
-    public void ForEach_NullArgsThrow() {
+    public void ForEachWide_NullArgsThrow() {
         WideList<int> list = new();
-        Assert.Throws<ArgumentNullException>(() => list.AsWide().ForEach((Action<int>)null));
-        Assert.Throws<ArgumentNullException>(() => list.AsWide().ForEach((Action<int, long>)null));
+        Assert.Throws<ArgumentNullException>(() => list.AsWide().ForEachWide((Action<int, long>)null));
     }
 }
