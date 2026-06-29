@@ -123,6 +123,7 @@ public sealed class WideEnumerableExtensionsTests {
     [TestMethod]
     public void ForEachWide_NullArgsThrow() {
         WideList<int> list = new();
-        Assert.Throws<ArgumentNullException>(() => list.AsWide().ForEachWide((Action<int, long>)null));
+        Assert.Throws<ArgumentNullException>(() => list.AsWide().ForEachWide(null));
+        Assert.Throws<ArgumentNullException>(() => WideEnumerableExtensions.ForEachWide<int>(null, (_, _) => { }));
     }
 }
