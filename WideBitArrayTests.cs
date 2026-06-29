@@ -1,4 +1,6 @@
-namespace WideCollections;
+using System.Runtime.Serialization;
+
+namespace com.hafthor.WideCollections;
 
 [TestClass]
 public sealed class WideBitArrayTests {
@@ -75,5 +77,70 @@ public sealed class WideBitArrayTests {
         Assert.IsFalse(bits[0]);
         Assert.IsFalse(bits[63]);
         Assert.IsFalse(bits[69]);
+    }
+
+    [TestMethod]
+    public void Clone_ProducesIndependentCopy() {
+        WideBitArray bits = new(70);
+        bits.Set(5);
+        bits.Set(64);
+
+        WideBitArray clone = (WideBitArray)bits.Clone();
+        bits.Clear(5);
+
+        Assert.AreEqual(70L, clone.Length);
+        Assert.IsTrue(clone[5]);
+        Assert.IsTrue(clone[64]);
+        Assert.IsFalse(bits[5]);
+    }
+
+    [TestMethod]
+    public void GetObjectData_PopulatesSerializationInfo() {
+        WideBitArray bits = new(70);
+        bits.Set(64);
+        SerializationInfo info = new(typeof(WideBitArray), new FormatterConverter());
+
+        bits.GetObjectData(info, new StreamingContext());
+
+        Assert.AreEqual(70L, info.GetInt64("_bitLength"));
+        ulong[] data = (ulong[])info.GetValue("_data", typeof(ulong[]));
+        Assert.AreEqual(1UL, data[1]);
+    }
+
+    [TestMethod]
+    public void SetAll_And_Or_Xor_Not_Work() {
+        WideBitArray a = new(70);
+        WideBitArray b = new(70);
+        a.Set(5);
+        a.Set(64);
+        b.Set(5);
+        b.Set(10);
+
+        a.And(b);
+        Assert.IsTrue(a[5]);
+        Assert.IsFalse(a[64]);
+        Assert.IsFalse(a[10]);
+
+        a.Or(b);
+        Assert.IsTrue(a[10]);
+
+        a.Xor(b);
+        Assert.IsFalse(a[5]);
+        Assert.IsFalse(a[10]);
+
+        WideBitArray all = new(70);
+        all.SetAll(true);
+        Assert.IsTrue(all[0]);
+        Assert.IsTrue(all[69]);
+        all.Not();
+        Assert.IsFalse(all[0]);
+        Assert.IsFalse(all[69]);
+    }
+
+    [TestMethod]
+    public void BitwiseOps_RequireSameLength() {
+        WideBitArray a = new(64);
+        WideBitArray b = new(128);
+        Assert.Throws<ArgumentException>(() => a.And(b));
     }
 }

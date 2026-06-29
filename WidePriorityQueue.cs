@@ -1,6 +1,6 @@
 using System.Runtime.CompilerServices;
 
-namespace WideCollections;
+namespace com.hafthor.WideCollections;
 
 public class WidePriorityQueue<TElement, TPriority> : ICompactable {
     private readonly WideArray<(TElement Element, TPriority Priority)> _nodes;
@@ -132,6 +132,37 @@ public class WidePriorityQueue<TElement, TPriority> : ICompactable {
     public void TrimExcess() {
         if (_nodes.Length != Count)
             _nodes.Resize(Count);
+    }
+
+    public bool Contains(TElement element) => FindIndex(element) >= 0;
+
+    public bool Remove(TElement element) {
+        long index = FindIndex(element);
+        if (index < 0)
+            return false;
+
+        long lastIndex = Count - 1;
+        (TElement Element, TPriority Priority) last = _nodes[lastIndex];
+        Count = lastIndex;
+
+        if (index < Count) {
+            MoveDown(last, index);
+            if (Comparer.Compare(_nodes[index].Priority, last.Priority) == 0)
+                MoveUp(last, index);
+        }
+
+        if (ContainsReferences)
+            _nodes[lastIndex] = default!;
+
+        return true;
+    }
+
+    private long FindIndex(TElement element) {
+        EqualityComparer<TElement> cmp = EqualityComparer<TElement>.Default;
+        for (long i = 0; i < Count; i++)
+            if (cmp.Equals(_nodes[i].Element, element))
+                return i;
+        return -1;
     }
 
     public void Clear() {

@@ -1,6 +1,6 @@
 using System.Collections;
 
-namespace WideCollections;
+namespace com.hafthor.WideCollections;
 
 public class WideSortedList<TKey, TValue> : IWideDictionary<TKey, TValue>, IWideDictionary, 
     IWideReadOnlyDictionary<TKey, TValue>, ICompactable where TKey : notnull {

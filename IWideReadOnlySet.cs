@@ -1,4 +1,4 @@
-namespace WideCollections;
+namespace com.hafthor.WideCollections;
 
 public interface IWideReadOnlySet<T> : IWideReadOnlyCollection<T> {
     bool Contains(T item);

@@ -1,4 +1,4 @@
-namespace WideCollections;
+namespace com.hafthor.WideCollections;
 
 [TestClass]
 public sealed class WideListTests {
@@ -149,11 +149,18 @@ public sealed class WideListTests {
     }
 
     [TestMethod]
-    public void ObjectBasedMembers_ThrowNotImplemented() {
+    public void ObjectBasedMembers_DelegateToGeneric() {
         IWideList list = new WideList<int>();
-        Assert.Throws<NotImplementedException>(() => list.IndexOf(1));
-        Assert.Throws<NotImplementedException>(() => list.Insert(0, 1));
-        Assert.Throws<NotImplementedException>(() => list.Remove(1));
+        list.Insert(0, 10);
+        list.Insert(1, 20);
+        list.Insert(2, 30);
+
+        Assert.AreEqual(1L, list.IndexOf(20));
+        Assert.AreEqual(-1L, list.IndexOf("not an int"));
+
+        list.Remove(20);
+        Assert.AreEqual(2L, list.Count);
+        Assert.AreEqual(-1L, list.IndexOf(20));
     }
 
     [TestMethod]
@@ -210,6 +217,22 @@ public sealed class WideListTests {
         list.Add(payload);
         list.RemoveAt(0);
         return weak;
+    }
+
+    [TestMethod]
+    public void AddRange_InsertRange_RemoveAll_Reverse_Work() {
+        WideList<int> list = new();
+        list.AddRange(new[] { 1, 2, 3 });
+        list.InsertRange(1, new[] { 8, 9 });
+
+        CollectionAssert.AreEqual(new[] { 1, 8, 9, 2, 3 }, list.ToArray());
+
+        long removed = list.RemoveAll(x => x % 2 == 0);
+        Assert.AreEqual(2L, removed);
+        CollectionAssert.AreEqual(new[] { 1, 9, 3 }, list.ToArray());
+
+        list.Reverse();
+        CollectionAssert.AreEqual(new[] { 3, 9, 1 }, list.ToArray());
     }
 
     private static void ForceGc() {

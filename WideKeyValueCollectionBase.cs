@@ -1,6 +1,6 @@
 using System.Collections;
 
-namespace WideCollections;
+namespace com.hafthor.WideCollections;
 
 /// <summary>
 /// Base class for key/value collection views. Subclasses implement abstract methods to handle

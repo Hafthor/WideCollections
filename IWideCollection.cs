@@ -1,6 +1,6 @@
 using System.Collections;
 
-namespace WideCollections;
+namespace com.hafthor.WideCollections;
 
 public interface IWideCollection<T> : IEnumerable<T> {
     long Count { get; }

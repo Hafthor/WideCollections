@@ -1,4 +1,4 @@
-namespace WideCollections;
+namespace com.hafthor.WideCollections;
 
 /// <summary>
 /// Represents a mutable long-indexed sequence of elements.

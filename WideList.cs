@@ -1,7 +1,7 @@
 using System.Collections;
 using System.Runtime.CompilerServices;
 
-namespace WideCollections;
+namespace com.hafthor.WideCollections;
 
 /// <summary>
 /// A generic list backed by WideArray that can grow beyond Array.MaxLength.
@@ -17,11 +17,14 @@ public class WideList<T> : IWideList<T>, IWideList, IWideReadOnlyList<T>, IWideI
     public bool IsFixedSize => false;
     internal WideArray<T> Items { get; }
 
-    public long IndexOf(object value) => throw new NotImplementedException();
+    public long IndexOf(object value) => value is T item ? IndexOf(item) : -1;
 
-    public void Insert(long index, object value) => throw new NotImplementedException();
+    public void Insert(long index, object value) => Insert(index, (T)value);
 
-    public void Remove(object value) => throw new NotImplementedException();
+    public void Remove(object value) {
+        if (value is T item)
+            Remove(item);
+    }
 
     public long Capacity {
         get => Items.Length;
@@ -66,6 +69,46 @@ public class WideList<T> : IWideList<T>, IWideList, IWideReadOnlyList<T>, IWideI
 
         Items[_count] = item;
         _count++;
+    }
+
+    public void AddRange(IEnumerable<T> collection) {
+        ArgumentNullException.ThrowIfNull(collection);
+
+        if (collection is IWideReadOnlyCollection<T> wide)
+            EnsureCapacity(_count + wide.Count);
+        else if (collection is ICollection<T> coll)
+            EnsureCapacity(_count + coll.Count);
+
+        foreach (T item in collection)
+            Add(item);
+    }
+
+    public void InsertRange(long index, IEnumerable<T> collection) {
+        ArgumentOutOfRangeException.ThrowIfNegative(index);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(index, _count);
+        ArgumentNullException.ThrowIfNull(collection);
+
+        long offset = 0;
+        foreach (T item in collection)
+            Insert(index + offset++, item);
+    }
+
+    public long RemoveAll(Predicate<T> match) {
+        ArgumentNullException.ThrowIfNull(match);
+
+        long removed = 0;
+        for (long i = _count - 1; i >= 0; i--)
+            if (match(Items[i])) {
+                RemoveAt(i);
+                removed++;
+            }
+
+        return removed;
+    }
+
+    public void Reverse() {
+        for (long lo = 0, hi = _count - 1; lo < hi; lo++, hi--)
+            (Items[lo], Items[hi]) = (Items[hi], Items[lo]);
     }
 
     public void Insert(long index, T item) {

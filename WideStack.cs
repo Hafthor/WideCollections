@@ -1,7 +1,7 @@
 using System.Collections;
 using System.Runtime.CompilerServices;
 
-namespace WideCollections;
+namespace com.hafthor.WideCollections;
 
 public class WideStack<T> : IWideCollection, IWideReadOnlyCollection<T>, ICompactable {
     private readonly WideArray<T> _items;

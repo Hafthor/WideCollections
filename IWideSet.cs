@@ -1,4 +1,4 @@
-namespace WideCollections;
+namespace com.hafthor.WideCollections;
 
 public interface IWideSet<T> : IWideCollection<T> {
     new bool Add(T item);

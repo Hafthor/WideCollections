@@ -1,6 +1,6 @@
 using System.Collections;
 
-namespace WideCollections;
+namespace com.hafthor.WideCollections;
 
 public class WideSortedSet<T> : IWideSet<T>, IWideCollection, IWideReadOnlySet<T>, ICompactable {
     private readonly WideList<T> _items;

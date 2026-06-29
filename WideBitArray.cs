@@ -1,7 +1,7 @@
 using System.Collections;
 using System.Runtime.Serialization;
 
-namespace WideCollections;
+namespace com.hafthor.WideCollections;
 
 /// <summary>
 /// A bit array backed by WideArray that can hold more bits than Array.MaxLength.
@@ -102,6 +102,53 @@ public class WideBitArray : IWideCollection, ICloneable, ISerializable {
 
     public void Clear() => _data.Clear();
 
+    public void SetAll(bool value) {
+        _data.Fill(value ? ulong.MaxValue : 0UL);
+        ClearTrailingBits();
+    }
+
+    public WideBitArray And(WideBitArray other) {
+        ValidateSameLength(other);
+        for (long i = 0; i < _data.Length; i++)
+            _data[i] &= other._data[i];
+        return this;
+    }
+
+    public WideBitArray Or(WideBitArray other) {
+        ValidateSameLength(other);
+        for (long i = 0; i < _data.Length; i++)
+            _data[i] |= other._data[i];
+        return this;
+    }
+
+    public WideBitArray Xor(WideBitArray other) {
+        ValidateSameLength(other);
+        for (long i = 0; i < _data.Length; i++)
+            _data[i] ^= other._data[i];
+        return this;
+    }
+
+    public WideBitArray Not() {
+        for (long i = 0; i < _data.Length; i++)
+            _data[i] = ~_data[i];
+        ClearTrailingBits();
+        return this;
+    }
+
+    private void ValidateSameLength(WideBitArray other) {
+        ArgumentNullException.ThrowIfNull(other);
+        if (other._bitLength != _bitLength)
+            throw new ArgumentException("Bit arrays must have the same length.", nameof(other));
+    }
+
+    private void ClearTrailingBits() {
+        int tail = (int)(_bitLength & BitsPerLongMask);
+        if (tail == 0 || _data.Length == 0)
+            return;
+        ulong mask = (1UL << tail) - 1;
+        _data[_data.Length - 1] &= mask;
+    }
+
     [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
     private void ValidateIndex(long index) {
         if (index < 0 || index >= _bitLength)
@@ -124,7 +171,18 @@ public class WideBitArray : IWideCollection, ICloneable, ISerializable {
     public object SyncRoot { get; } = new();
     public bool IsSynchronized => false;
     
-    public object Clone() => throw new NotImplementedException();
+    public object Clone() {
+        WideBitArray clone = new(_bitLength);
+        _data.CopyTo(clone._data, 0);
+        return clone;
+    }
 
-    public void GetObjectData(SerializationInfo info, StreamingContext context) => throw new NotImplementedException();
+    public void GetObjectData(SerializationInfo info, StreamingContext context) {
+        ArgumentNullException.ThrowIfNull(info);
+        info.AddValue(nameof(_bitLength), _bitLength);
+        ulong[] data = new ulong[_data.Length];
+        for (long i = 0; i < _data.Length; i++)
+            data[i] = _data[i];
+        info.AddValue(nameof(_data), data);
+    }
 }

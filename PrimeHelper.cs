@@ -1,4 +1,4 @@
-namespace WideCollections;
+namespace com.hafthor.WideCollections;
 
 internal static class PrimeHelper {
     private static readonly long[] HashTablePrimeCapacities = [

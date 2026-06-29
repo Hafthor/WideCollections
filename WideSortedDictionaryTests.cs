@@ -1,4 +1,4 @@
-namespace WideCollections;
+namespace com.hafthor.WideCollections;
 
 [TestClass]
 public sealed class WideSortedDictionaryTests {

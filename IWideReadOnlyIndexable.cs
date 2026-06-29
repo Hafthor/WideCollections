@@ -1,4 +1,4 @@
-namespace WideCollections;
+namespace com.hafthor.WideCollections;
 
 /// <summary>
 /// Represents a read-only long-indexed sequence of elements.

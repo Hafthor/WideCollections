@@ -1,6 +1,6 @@
 using System.Collections;
 
-namespace WideCollections;
+namespace com.hafthor.WideCollections;
 
 
 /// <summary>

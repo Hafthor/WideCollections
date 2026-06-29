@@ -1,4 +1,4 @@
-namespace WideCollections;
+namespace com.hafthor.WideCollections;
 
 [TestClass]
 public sealed class WidePriorityQueueTests {
@@ -121,6 +121,46 @@ public sealed class WidePriorityQueueTests {
         queue.Enqueue(payload, 1);
         queue.Dequeue();
         return weak;
+    }
+
+    [TestMethod]
+    public void ContainsAndRemove_WorkAndPreserveHeapOrder() {
+        WidePriorityQueue<string, int> pq = new();
+        pq.Enqueue("a", 5);
+        pq.Enqueue("b", 1);
+        pq.Enqueue("c", 3);
+        pq.Enqueue("d", 2);
+        pq.Enqueue("e", 4);
+
+        Assert.IsTrue(pq.Contains("c"));
+        Assert.IsFalse(pq.Contains("z"));
+
+        Assert.IsTrue(pq.Remove("c"));
+        Assert.IsFalse(pq.Remove("c"));
+        Assert.AreEqual(4L, pq.Count);
+
+        Assert.AreEqual("b", pq.Dequeue());
+        Assert.AreEqual("d", pq.Dequeue());
+        Assert.AreEqual("e", pq.Dequeue());
+        Assert.AreEqual("a", pq.Dequeue());
+    }
+
+    [TestMethod]
+    public void Remove_Randomized_PreservesHeapOrdering() {
+        WidePriorityQueue<int, int> pq = new();
+        Random r = new(42);
+        for (int i = 0; i < 200; i++)
+            pq.Enqueue(i, r.Next(1000));
+
+        for (int i = 0; i < 80; i++)
+            pq.Remove(i);
+
+        int prev = int.MinValue;
+        while (pq.Count > 0) {
+            Assert.IsTrue(pq.TryDequeue(out _, out int p));
+            Assert.IsTrue(p >= prev, "heap order violated");
+            prev = p;
+        }
     }
 
     private static void ForceGc() {

@@ -1,6 +1,6 @@
 using System.Collections;
 
-namespace WideCollections;
+namespace com.hafthor.WideCollections;
 
 /// <summary>
 /// Represents a read-only view over a contiguous region of a long-indexed collection.

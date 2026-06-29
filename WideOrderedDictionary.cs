@@ -1,6 +1,6 @@
 using System.Collections;
 
-namespace WideCollections;
+namespace com.hafthor.WideCollections;
 
 public class WideOrderedDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>, IWideList<KeyValuePair<TKey, TValue>>,
     IWideReadOnlyDictionary<TKey, TValue>, IWideReadOnlyList<KeyValuePair<TKey, TValue>>, IWideDictionary, IWideList,

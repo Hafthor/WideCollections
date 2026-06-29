@@ -5,13 +5,36 @@
         <LangVersion>latest</LangVersion>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>disable</Nullable>
+        <RootNamespace>com.hafthor.WideCollections</RootNamespace>
+
+        <!-- Include tests by default; pass -p:IncludeTests=false to produce a clean library/package -->
+        <IncludeTests Condition="'$(IncludeTests)' == ''">true</IncludeTests>
+        <IsPackable Condition="'$(IncludeTests)' == 'true'">false</IsPackable>
+
+        <PackageId>WideCollections</PackageId>
+        <Version>1.0.0</Version>
+        <Authors>Hafthor</Authors>
+        <Description>High-performance .NET collections supporting 64-bit (long) indexing beyond Array.MaxLength via segmented backing arrays. Includes WideArray, WideList, WideDictionary, WideHashSet, WideSortedSet/List/Dictionary, WideQueue, WideStack, WidePriorityQueue, WideBitArray, and WideMemory.</Description>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <RepositoryUrl>https://github.com/Hafthor/WideCollections</RepositoryUrl>
+        <PackageProjectUrl>https://github.com/Hafthor/WideCollections</PackageProjectUrl>
+        <PackageTags>collections;long;large;array;list;dictionary;hashset;wide;64-bit</PackageTags>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <NoWarn>$(NoWarn);CS1591</NoWarn>
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="MSTest" Version="4.0.1"/>
+        <None Include="README.md" Pack="true" PackagePath="\" />
     </ItemGroup>
 
-    <ItemGroup>
+    <ItemGroup Condition="'$(IncludeTests)' != 'true'">
+        <Compile Remove="**/*Tests.cs" />
+        <Compile Remove="MSTestSettings.cs" />
+    </ItemGroup>
+
+    <ItemGroup Condition="'$(IncludeTests)' == 'true'">
+        <PackageReference Include="MSTest" Version="4.0.1"/>
         <Using Include="Microsoft.VisualStudio.TestTools.UnitTesting"/>
     </ItemGroup>
 

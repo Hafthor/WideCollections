@@ -1,7 +1,7 @@
 using System.Collections;
 using System.Runtime.CompilerServices;
 
-namespace WideCollections;
+namespace com.hafthor.WideCollections;
 
 public class WideQueue<T> : IWideCollection, IWideReadOnlyCollection<T>, ICompactable {
     private WideArray<T> _items;

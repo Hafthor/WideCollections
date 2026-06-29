@@ -1,7 +1,7 @@
 using System.Collections;
 using System.Runtime.CompilerServices;
 
-namespace WideCollections;
+namespace com.hafthor.WideCollections;
 
 public class WideHashSet<T> : IWideSet<T>, IWideReadOnlySet<T>, ICompactable {
     private const long Lower31BitMask = 0x7FFFFFFF;

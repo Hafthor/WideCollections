@@ -1,7 +1,7 @@
 using System.Collections;
 using System.Diagnostics.CodeAnalysis;
 
-namespace WideCollections;
+namespace com.hafthor.WideCollections;
 
 public interface IWideDictionary : IWideCollection {
     object this[object key] { get; set; }

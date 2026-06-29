@@ -1,4 +1,4 @@
-namespace WideCollections;
+namespace com.hafthor.WideCollections;
 
 [TestClass]
 public sealed class WideDictionaryTests {
@@ -118,5 +118,15 @@ public sealed class WideDictionaryTests {
 
         Assert.IsLessThan(before, after);
         CollectionAssert.AreEquivalent(new[] { 25, 26, 27, 28, 29 }, dictionary.Keys.OrderBy(x => x).ToArray());
+    }
+
+    [TestMethod]
+    public void TryAdd_AddsOnceAndReportsDuplicate() {
+        WideDictionary<string, int> dictionary = new();
+
+        Assert.IsTrue(dictionary.TryAdd("a", 1));
+        Assert.IsFalse(dictionary.TryAdd("a", 2));
+        Assert.AreEqual(1, dictionary["a"]);
+        Assert.AreEqual(1L, dictionary.Count);
     }
 }

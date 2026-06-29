@@ -1,4 +1,4 @@
-namespace WideCollections;
+namespace com.hafthor.WideCollections;
 
 public interface IWideList<T> : IWideCollection<T>, IWideEnumerable<T> {
     T this[long index] { get; set; }

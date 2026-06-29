@@ -1,6 +1,6 @@
 using System.Collections;
 
-namespace WideCollections;
+namespace com.hafthor.WideCollections;
 
 public static class WideEnumerableExtensions {
     public static IWideEnumerable<T> AsWide<T>(this IEnumerable<T> source) {

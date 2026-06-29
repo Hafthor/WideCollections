@@ -1,6 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 
-namespace WideCollections;
+namespace com.hafthor.WideCollections;
 
 public interface IWideReadOnlyDictionary<TKey, TValue> : IWideReadOnlyCollection<KeyValuePair<TKey, TValue>> {
     bool ContainsKey(TKey key);

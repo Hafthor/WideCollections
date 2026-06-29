@@ -1,6 +1,6 @@
 using System.Collections;
 
-namespace WideCollections;
+namespace com.hafthor.WideCollections;
 
 public class WideDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>, IWideDictionary, 
     IWideReadOnlyDictionary<TKey, TValue>, ICompactable where TKey : notnull {
@@ -88,6 +88,8 @@ public class WideDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
     }
 
     public void Add(TKey key, TValue value) => TryInsert(key, value, InsertionBehavior.ThrowOnExisting);
+
+    public bool TryAdd(TKey key, TValue value) => TryInsert(key, value, InsertionBehavior.None);
 
     void IWideCollection<KeyValuePair<TKey, TValue>>.Add(KeyValuePair<TKey, TValue> item) => Add(item.Key, item.Value);
 
@@ -274,7 +276,7 @@ public class WideDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
         return -1;
     }
 
-    private void TryInsert(TKey key, TValue value, InsertionBehavior behavior) {
+    private bool TryInsert(TKey key, TValue value, InsertionBehavior behavior) {
         ArgumentNullException.ThrowIfNull(key);
 
         if (_buckets.Length == 0)
@@ -290,8 +292,11 @@ public class WideDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
                     entry.Value = value;
                     _entries[i] = entry;
                     _version++;
-                    return;
+                    return true;
                 }
+
+                if (behavior == InsertionBehavior.None)
+                    return false;
 
                 throw new ArgumentException("An item with the same key has already been added.", nameof(key));
             }
@@ -320,6 +325,7 @@ public class WideDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
         };
         _buckets[bucket] = index + 1;
         _version++;
+        return true;
     }
 
     private void Initialize(long capacity) {
@@ -368,6 +374,7 @@ public class WideDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
     }
 
     private enum InsertionBehavior {
+        None,
         OverwriteExisting,
         ThrowOnExisting
     }
