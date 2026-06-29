@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
 
 namespace com.hafthor.WideCollections;
@@ -109,28 +110,50 @@ public class WideBitArray : IWideCollection, ICloneable, ISerializable {
 
     public WideBitArray And(WideBitArray other) {
         ValidateSameLength(other);
-        for (long i = 0; i < _data.Length; i++)
-            _data[i] &= other._data[i];
+        if (_data.SegmentShift != other._data.SegmentShift)
+            for (long i = 0; i < _data.Length; i++)
+                _data[i] &= other._data[i];
+        else
+            for (int segment = 0; segment < _data.Segments.Length; segment++) {
+                ulong[] segmentData = _data.Segments[segment], otherSegmentData = other._data.Segments[segment];
+                for (int i = 0; i < segmentData.Length; i++)
+                    segmentData[i] &= otherSegmentData[i];
+            }
         return this;
     }
 
     public WideBitArray Or(WideBitArray other) {
         ValidateSameLength(other);
-        for (long i = 0; i < _data.Length; i++)
-            _data[i] |= other._data[i];
+        if (_data.SegmentShift != other._data.SegmentShift)
+            for (long i = 0; i < _data.Length; i++)
+                _data[i] |= other._data[i];
+        else
+            for (int segment = 0; segment < _data.Segments.Length; segment++) {
+                ulong[] segmentData = _data.Segments[segment], otherSegmentData = other._data.Segments[segment];
+                for (int i = 0; i < segmentData.Length; i++)
+                    segmentData[i] |= otherSegmentData[i];
+            }
         return this;
     }
 
     public WideBitArray Xor(WideBitArray other) {
         ValidateSameLength(other);
-        for (long i = 0; i < _data.Length; i++)
-            _data[i] ^= other._data[i];
+        if (_data.SegmentShift != other._data.SegmentShift)
+            for (long i = 0; i < _data.Length; i++)
+                _data[i] ^= other._data[i];
+        else
+            for (int segment = 0; segment < _data.Segments.Length; segment++) {
+                ulong[] segmentData = _data.Segments[segment], otherSegmentData = other._data.Segments[segment];
+                for (int i = 0; i < segmentData.Length; i++)
+                    segmentData[i] ^= otherSegmentData[i];
+            }
         return this;
     }
 
     public WideBitArray Not() {
-        for (long i = 0; i < _data.Length; i++)
-            _data[i] = ~_data[i];
+        foreach (ulong[] segmentData in _data.Segments)
+            for (int i = 0; i < segmentData.Length; i++)
+                segmentData[i] = ~segmentData[i];
         ClearTrailingBits();
         return this;
     }
@@ -149,14 +172,14 @@ public class WideBitArray : IWideCollection, ICloneable, ISerializable {
         _data[_data.Length - 1] &= mask;
     }
 
-    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void ValidateIndex(long index) {
         if (index < 0 || index >= _bitLength)
             throw new IndexOutOfRangeException(
                 $"Index {index} is out of range for WideBitArray of length {_bitLength}.");
     }
 
-    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void GetLongAndBitOffset(long index, out long longIndex, out int bitOffset) {
         longIndex = index >> BitsPerLongShift;
         bitOffset = (int)(index & BitsPerLongMask);
