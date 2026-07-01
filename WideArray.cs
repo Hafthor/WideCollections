@@ -12,13 +12,20 @@ public class WideArray<T> : IWideCollection<T>, IWideReadOnlyCollection<T>, IWid
 
     private T[][] _segments = [];
     private long _length;
-    private readonly int _segmentShift;
-    private readonly int _segmentSize;
-    private readonly int _segmentMask;
+    private readonly int _segmentShift, _segmentSize, _segmentMask;
 
+    /// <summary>
+    /// Gets the total number of elements in the array.
+    /// </summary>
     public long Length => _length;
+    /// <summary>
+    /// Gets the underlying jagged array of segments that back this array. Intended for advanced or test scenarios.
+    /// </summary>
     public T[][] Segments => _segments;
 
+    /// <summary>
+    /// Initializes a new, empty instance of the <see cref="WideArray{T}"/> class.
+    /// </summary>
     public WideArray() : this(0) { }
 
     /// <summary>
@@ -57,18 +64,31 @@ public class WideArray<T> : IWideCollection<T>, IWideReadOnlyCollection<T>, IWid
         _length = capacity;
     }
 
+    /// <summary>
+    /// Returns the element at the specified index.
+    /// </summary>
+    /// <param name="index">The zero-based index of the element to get.</param>
+    /// <returns>The element stored at <paramref name="index"/>.</returns>
+    /// <exception cref="IndexOutOfRangeException"><paramref name="index"/> is negative or greater than or equal to <see cref="Length"/>.</exception>
     public T Get(long index) {
         ValidateIndex(index);
         GetSegmentAndOffset(index, out int segmentIndex, out int offset);
         return _segments[segmentIndex][offset];
     }
 
+    /// <summary>
+    /// Stores a value at the specified index.
+    /// </summary>
+    /// <param name="index">The zero-based index of the element to set.</param>
+    /// <param name="value">The value to store at <paramref name="index"/>.</param>
+    /// <exception cref="IndexOutOfRangeException"><paramref name="index"/> is negative or greater than or equal to <see cref="Length"/>.</exception>
     public void Set(long index, T value) {
         ValidateIndex(index);
         GetSegmentAndOffset(index, out int segmentIndex, out int offset);
         _segments[segmentIndex][offset] = value;
     }
 
+    /// <inheritdoc />
     public T this[long index] {
         get => Get(index);
         set => Set(index, value);
@@ -151,19 +171,24 @@ public class WideArray<T> : IWideCollection<T>, IWideReadOnlyCollection<T>, IWid
         return Interlocked.CompareExchange(ref _segments[segmentIndex][offset], newValue, comparand);
     }
 
+    /// <inheritdoc />
     public long Count => _length;
+    /// <inheritdoc />
     public bool IsReadOnly => false;
 
+    /// <inheritdoc />
     public void Add(T item) {
         throw new NotImplementedException();
     }
 
+    /// <inheritdoc />
     public void Clear() {
         foreach (T[] segment in _segments)
             if (segment != null)
                 Array.Clear(segment, 0, segment.Length);
     }
 
+    /// <inheritdoc />
     public bool Contains(T findItem) {
         var comparer = EqualityComparer<T>.Default;
         foreach (T[] segment in _segments)
@@ -173,6 +198,7 @@ public class WideArray<T> : IWideCollection<T>, IWideReadOnlyCollection<T>, IWid
         return false;
     }
     
+    /// <inheritdoc />
     public void CopyTo(WideArray<T> array, long arrayIndex) {
         ArgumentNullException.ThrowIfNull(array);
         ArgumentOutOfRangeException.ThrowIfNegative(arrayIndex);
@@ -205,16 +231,41 @@ public class WideArray<T> : IWideCollection<T>, IWideReadOnlyCollection<T>, IWid
         }
     }
     
+    /// <inheritdoc />
     public bool Remove(T item) => throw new NotImplementedException();
 
+    /// <summary>
+    /// Sets every element in the array to the specified value.
+    /// </summary>
+    /// <param name="value">The value to assign to all elements.</param>
     public void Fill(T value) {
         foreach (T[] segment in _segments)
             Array.Fill(segment, value);
     }
 
+    /// <summary>
+    /// Creates a <see cref="WideMemory{T}"/> that spans the entire array.
+    /// </summary>
+    /// <returns>A memory region covering all elements of this array.</returns>
     public WideMemory<T> AsMemory() => new WideMemory<T>(this);
+    /// <summary>
+    /// Creates a <see cref="WideMemory{T}"/> over a contiguous range of this array.
+    /// </summary>
+    /// <param name="start">The zero-based index at which the range begins.</param>
+    /// <param name="length">The number of elements in the range.</param>
+    /// <returns>A memory region covering the specified range.</returns>
     public WideMemory<T> AsMemory(long start, long length) => new WideMemory<T>(this).Slice(start, length);
+    /// <summary>
+    /// Creates a read-only <see cref="WideReadOnlyMemory{T}"/> that spans the entire array.
+    /// </summary>
+    /// <returns>A read-only memory region covering all elements of this array.</returns>
     public WideReadOnlyMemory<T> AsReadOnlyMemory() => new WideReadOnlyMemory<T>(this);
+    /// <summary>
+    /// Creates a read-only <see cref="WideReadOnlyMemory{T}"/> over a contiguous range of this array.
+    /// </summary>
+    /// <param name="start">The zero-based index at which the range begins.</param>
+    /// <param name="length">The number of elements in the range.</param>
+    /// <returns>A read-only memory region covering the specified range.</returns>
     public WideReadOnlyMemory<T> AsReadOnlyMemory(long start, long length) => new WideReadOnlyMemory<T>(this).Slice(start, length);
 
     /// <summary>
@@ -232,6 +283,7 @@ public class WideArray<T> : IWideCollection<T>, IWideReadOnlyCollection<T>, IWid
             destination[destinationIndex + i] = source[sourceIndex + i];
     }
 
+    /// <inheritdoc />
     public object Clone() {
         WideArray<T> clone = new(0, _segmentShift);
         clone.Resize(_length);
@@ -240,6 +292,7 @@ public class WideArray<T> : IWideCollection<T>, IWideReadOnlyCollection<T>, IWid
         return clone;
     }
 
+    /// <inheritdoc />
     public IEnumerator<T> GetEnumerator() {
        foreach (T[] segment in _segments)
            foreach (T item in segment)

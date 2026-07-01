@@ -3,6 +3,10 @@ using System.Runtime.CompilerServices;
 
 namespace com.hafthor.WideCollections;
 
+/// <summary>
+/// Represents a set of values with no duplicate elements. Backed by <see cref="WideArray{T}"/>-based
+/// storage so it can hold more than <see cref="int.MaxValue"/> elements.
+/// </summary>
 public class WideHashSet<T> : IWideSet<T>, IWideReadOnlySet<T>, ICompactable {
     private const long Lower31BitMask = 0x7FFFFFFF;
 
@@ -13,13 +17,32 @@ public class WideHashSet<T> : IWideSet<T>, IWideReadOnlySet<T>, ICompactable {
     private static readonly bool ContainsReferences = RuntimeHelpers.IsReferenceOrContainsReferences<T>();
 
     private struct Entry {
+        /// <summary>
+        /// Stores the cached hash code for the entry, or a negative value when the entry is unused.
+        /// </summary>
         public int HashCode;
+        /// <summary>
+        /// Stores the index of the next entry in the same bucket chain, or -1 when there is none.
+        /// </summary>
         public long Next;
+        /// <summary>
+        /// Stores the value contained by the entry.
+        /// </summary>
         public T Value;
     }
 
+    /// <summary>
+    /// Initializes a new empty instance of the <see cref="WideHashSet{T}"/> class that uses the specified equality comparer.
+    /// </summary>
+    /// <param name="comparer">The equality comparer to use, or <see langword="null"/> to use the default comparer.</param>
     public WideHashSet(IEqualityComparer<T> comparer) : this(0, comparer) { }
 
+    /// <summary>
+    /// Initializes a new empty instance of the <see cref="WideHashSet{T}"/> class with the specified initial capacity and equality comparer.
+    /// </summary>
+    /// <param name="capacity">The initial number of elements the set can contain.</param>
+    /// <param name="comparer">The equality comparer to use, or <see langword="null"/> to use the default comparer.</param>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="capacity"/> is negative.</exception>
     public WideHashSet(long capacity = 0, IEqualityComparer<T> comparer = null) {
         ArgumentOutOfRangeException.ThrowIfNegative(capacity);
 
@@ -28,6 +51,12 @@ public class WideHashSet<T> : IWideSet<T>, IWideReadOnlySet<T>, ICompactable {
             Initialize(capacity);
     }
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="WideHashSet{T}"/> class that contains the elements copied from the specified collection.
+    /// </summary>
+    /// <param name="collection">The collection whose elements are copied to the set.</param>
+    /// <param name="comparer">The equality comparer to use, or <see langword="null"/> to use the default comparer.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="collection"/> is <see langword="null"/>.</exception>
     public WideHashSet(IEnumerable<T> collection, IEqualityComparer<T> comparer = null) : this(0, comparer) {
         ArgumentNullException.ThrowIfNull(collection);
 
@@ -37,15 +66,22 @@ public class WideHashSet<T> : IWideSet<T>, IWideReadOnlySet<T>, ICompactable {
         UnionWith(collection);
     }
 
+    /// <inheritdoc />
     public long Count => _count - _freeCount;
+    /// <inheritdoc />
     public bool IsReadOnly => false;
+    /// <summary>
+    /// Gets the equality comparer used to compare values in the set.
+    /// </summary>
     public IEqualityComparer<T> Comparer => _comparer;
     internal long InternalEntriesLength => _entries.Length;
 
+    /// <inheritdoc />
     public bool Add(T item) => AddIfNotPresent(item);
 
     void IWideCollection<T>.Add(T item) => Add(item);
 
+    /// <inheritdoc />
     public void Clear() {
         if (_count == 0)
             return;
@@ -74,6 +110,7 @@ public class WideHashSet<T> : IWideSet<T>, IWideReadOnlySet<T>, ICompactable {
         _version++;
     }
 
+    /// <inheritdoc />
     public bool Contains(T item) {
         if (_buckets.Length == 0)
             return false;
@@ -90,6 +127,7 @@ public class WideHashSet<T> : IWideSet<T>, IWideReadOnlySet<T>, ICompactable {
         return false;
     }
 
+    /// <inheritdoc />
     public void CopyTo(WideArray<T> array, long arrayIndex) {
         ArgumentNullException.ThrowIfNull(array);
 
@@ -107,6 +145,7 @@ public class WideHashSet<T> : IWideSet<T>, IWideReadOnlySet<T>, ICompactable {
         }
     }
 
+    /// <inheritdoc />
     public bool Remove(T item) {
         if (_buckets.Length == 0)
             return false;
@@ -143,6 +182,7 @@ public class WideHashSet<T> : IWideSet<T>, IWideReadOnlySet<T>, ICompactable {
         return false;
     }
 
+    /// <inheritdoc />
     public void UnionWith(IEnumerable<T> other) {
         ArgumentNullException.ThrowIfNull(other);
 
@@ -150,6 +190,7 @@ public class WideHashSet<T> : IWideSet<T>, IWideReadOnlySet<T>, ICompactable {
             AddIfNotPresent(item);
     }
 
+    /// <inheritdoc />
     public void IntersectWith(IEnumerable<T> other) {
         ArgumentNullException.ThrowIfNull(other);
 
@@ -172,6 +213,7 @@ public class WideHashSet<T> : IWideSet<T>, IWideReadOnlySet<T>, ICompactable {
         }
     }
 
+    /// <inheritdoc />
     public void ExceptWith(IEnumerable<T> other) {
         ArgumentNullException.ThrowIfNull(other);
 
@@ -187,6 +229,7 @@ public class WideHashSet<T> : IWideSet<T>, IWideReadOnlySet<T>, ICompactable {
             Remove(item);
     }
 
+    /// <inheritdoc />
     public void SymmetricExceptWith(IEnumerable<T> other) {
         ArgumentNullException.ThrowIfNull(other);
 
@@ -202,6 +245,7 @@ public class WideHashSet<T> : IWideSet<T>, IWideReadOnlySet<T>, ICompactable {
         }
     }
 
+    /// <inheritdoc />
     public bool IsSubsetOf(IEnumerable<T> other) {
         ArgumentNullException.ThrowIfNull(other);
 
@@ -223,6 +267,7 @@ public class WideHashSet<T> : IWideSet<T>, IWideReadOnlySet<T>, ICompactable {
         return true;
     }
 
+    /// <inheritdoc />
     public bool IsSupersetOf(IEnumerable<T> other) {
         ArgumentNullException.ThrowIfNull(other);
 
@@ -234,6 +279,7 @@ public class WideHashSet<T> : IWideSet<T>, IWideReadOnlySet<T>, ICompactable {
         return true;
     }
 
+    /// <inheritdoc />
     public bool IsProperSupersetOf(IEnumerable<T> other) {
         ArgumentNullException.ThrowIfNull(other);
 
@@ -249,6 +295,7 @@ public class WideHashSet<T> : IWideSet<T>, IWideReadOnlySet<T>, ICompactable {
         return true;
     }
 
+    /// <inheritdoc />
     public bool IsProperSubsetOf(IEnumerable<T> other) {
         ArgumentNullException.ThrowIfNull(other);
 
@@ -264,6 +311,7 @@ public class WideHashSet<T> : IWideSet<T>, IWideReadOnlySet<T>, ICompactable {
         return true;
     }
 
+    /// <inheritdoc />
     public bool Overlaps(IEnumerable<T> other) {
         ArgumentNullException.ThrowIfNull(other);
 
@@ -278,6 +326,7 @@ public class WideHashSet<T> : IWideSet<T>, IWideReadOnlySet<T>, ICompactable {
         return false;
     }
 
+    /// <inheritdoc />
     public bool SetEquals(IEnumerable<T> other) {
         ArgumentNullException.ThrowIfNull(other);
 
@@ -296,6 +345,7 @@ public class WideHashSet<T> : IWideSet<T>, IWideReadOnlySet<T>, ICompactable {
         return true;
     }
 
+    /// <inheritdoc />
     public void Compact() {
         long liveCount = Count;
         if (liveCount == 0) {
@@ -333,6 +383,7 @@ public class WideHashSet<T> : IWideSet<T>, IWideReadOnlySet<T>, ICompactable {
         _version++;
     }
 
+    /// <inheritdoc />
     public IEnumerator<T> GetEnumerator() => new Enumerator(this);
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
@@ -411,6 +462,9 @@ public class WideHashSet<T> : IWideSet<T>, IWideReadOnlySet<T>, ICompactable {
         return _comparer.GetHashCode(item) & (int)Lower31BitMask;
     }
 
+    /// <summary>
+    /// Enumerates the elements of a <see cref="WideHashSet{T}"/>.
+    /// </summary>
     public struct Enumerator : IEnumerator<T> {
         private readonly WideHashSet<T> _set;
         private readonly long _version;
@@ -424,9 +478,11 @@ public class WideHashSet<T> : IWideSet<T>, IWideReadOnlySet<T>, ICompactable {
             _current = default!;
         }
 
+        /// <inheritdoc />
         public T Current => _current;
         object IEnumerator.Current => _current!;
 
+        /// <inheritdoc />
         public bool MoveNext() {
             if (_version != _set._version)
                 throw new InvalidOperationException("Collection was modified during enumeration.");
@@ -445,6 +501,7 @@ public class WideHashSet<T> : IWideSet<T>, IWideReadOnlySet<T>, ICompactable {
             return false;
         }
 
+        /// <inheritdoc />
         public void Reset() {
             if (_version != _set._version)
                 throw new InvalidOperationException("Collection was modified during enumeration.");
@@ -453,6 +510,7 @@ public class WideHashSet<T> : IWideSet<T>, IWideReadOnlySet<T>, ICompactable {
             _current = default!;
         }
 
+        /// <inheritdoc />
         public void Dispose() { }
     }
 }

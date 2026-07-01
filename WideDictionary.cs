@@ -2,16 +2,17 @@ using System.Collections;
 
 namespace com.hafthor.WideCollections;
 
+/// <summary>
+/// Represents a collection of keys and values. Backed by <see cref="WideArray{T}"/>-based storage so it
+/// can hold more than <see cref="int.MaxValue"/> elements.
+/// </summary>
 public class WideDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>, IWideDictionary, 
     IWideReadOnlyDictionary<TKey, TValue>, ICompactable where TKey : notnull {
     private const long Lower31BitMask = 0x7FFFFFFF;
 
     private WideArray<long> _buckets = new();
     private WideArray<Entry> _entries = new();
-    private long _count;
-    private long _freeList = -1;
-    private long _freeCount;
-    private long _version;
+    private long _count, _freeList = -1, _freeCount, _version;
     private readonly IEqualityComparer<TKey> _comparer;
     private KeyCollection _keys;
     private ValueCollection _values;
@@ -23,12 +24,32 @@ public class WideDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
         public TValue Value;
     }
 
+    /// <summary>
+    /// Initializes a new, empty instance of the <see cref="WideDictionary{TKey, TValue}"/> class
+    /// that uses the default equality comparer for the key type.
+    /// </summary>
     public WideDictionary() : this(0, null) { }
 
+    /// <summary>
+    /// Initializes a new, empty instance of the <see cref="WideDictionary{TKey, TValue}"/> class
+    /// with the specified initial capacity.
+    /// </summary>
+    /// <param name="capacity">The initial number of elements the dictionary can hold before resizing.</param>
     public WideDictionary(long capacity) : this(capacity, null) { }
 
+    /// <summary>
+    /// Initializes a new, empty instance of the <see cref="WideDictionary{TKey, TValue}"/> class
+    /// that uses the specified key equality comparer.
+    /// </summary>
+    /// <param name="comparer">The comparer used to compare keys, or <see langword="null"/> to use the default comparer.</param>
     public WideDictionary(IEqualityComparer<TKey> comparer) : this(0, comparer) { }
 
+    /// <summary>
+    /// Initializes a new, empty instance of the <see cref="WideDictionary{TKey, TValue}"/> class
+    /// with the specified initial capacity and key equality comparer.
+    /// </summary>
+    /// <param name="capacity">The initial number of elements the dictionary can hold before resizing.</param>
+    /// <param name="comparer">The comparer used to compare keys, or <see langword="null"/> to use the default comparer.</param>
     public WideDictionary(long capacity, IEqualityComparer<TKey> comparer) {
         ArgumentOutOfRangeException.ThrowIfNegative(capacity);
 
@@ -38,8 +59,19 @@ public class WideDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
             Initialize(capacity);
     }
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="WideDictionary{TKey, TValue}"/> class that contains
+    /// the key/value pairs copied from the specified collection, using the default key comparer.
+    /// </summary>
+    /// <param name="collection">The collection whose key/value pairs are copied into the dictionary.</param>
     public WideDictionary(IEnumerable<KeyValuePair<TKey, TValue>> collection) : this(collection, null) { }
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="WideDictionary{TKey, TValue}"/> class that contains
+    /// the key/value pairs copied from the specified collection, using the specified key comparer.
+    /// </summary>
+    /// <param name="collection">The collection whose key/value pairs are copied into the dictionary.</param>
+    /// <param name="comparer">The comparer used to compare keys, or <see langword="null"/> to use the default comparer.</param>
     public WideDictionary(IEnumerable<KeyValuePair<TKey, TValue>> collection, IEqualityComparer<TKey> comparer) : this(0, comparer) {
         ArgumentNullException.ThrowIfNull(collection);
 
@@ -50,13 +82,19 @@ public class WideDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
             Add(pair.Key, pair.Value);
     }
 
+    /// <inheritdoc />
     public long Count => _count - _freeCount;
+    /// <inheritdoc />
     public bool IsReadOnly => false;
+    /// <inheritdoc />
     public bool IsFixedSize => false;
+    /// <inheritdoc />
     public object SyncRoot { get; } = new();
+    /// <inheritdoc />
     public bool IsSynchronized => false;
     internal long InternalEntriesLength => _entries.Length;
 
+    /// <inheritdoc />
     public TValue this[TKey key] {
         get {
             long index = FindEntryIndex(key);
@@ -68,7 +106,9 @@ public class WideDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
         set => TryInsert(key, value, InsertionBehavior.OverwriteExisting);
     }
 
+    /// <inheritdoc />
     public IWideCollection<TKey> Keys => _keys ??= new KeyCollection(this);
+    /// <inheritdoc />
     public IWideCollection<TValue> Values => _values ??= new ValueCollection(this);
     IEnumerable<TKey> IWideReadOnlyDictionary<TKey, TValue>.Keys => Keys;
     IEnumerable<TValue> IWideReadOnlyDictionary<TKey, TValue>.Values => Values;
@@ -87,8 +127,15 @@ public class WideDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
         }
     }
 
+    /// <inheritdoc />
     public void Add(TKey key, TValue value) => TryInsert(key, value, InsertionBehavior.ThrowOnExisting);
 
+    /// <summary>
+    /// Attempts to add the specified key and value to the dictionary. Does nothing if the key already exists.
+    /// </summary>
+    /// <param name="key">The key of the element to add.</param>
+    /// <param name="value">The value of the element to add.</param>
+    /// <returns><see langword="true"/> if the key/value pair was added; <see langword="false"/> if the key already exists.</returns>
     public bool TryAdd(TKey key, TValue value) => TryInsert(key, value, InsertionBehavior.None);
 
     void IWideCollection<KeyValuePair<TKey, TValue>>.Add(KeyValuePair<TKey, TValue> item) => Add(item.Key, item.Value);
@@ -99,8 +146,10 @@ public class WideDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
         Add((TKey)key, (TValue)value);
     }
 
+    /// <inheritdoc />
     public bool ContainsKey(TKey key) => FindEntryIndex(key) >= 0;
 
+    /// <inheritdoc />
     public bool TryGetValue(TKey key, out TValue value) {
         long index = FindEntryIndex(key);
         if (index >= 0) {
@@ -112,6 +161,7 @@ public class WideDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
         return false;
     }
 
+    /// <inheritdoc />
     public bool Remove(TKey key) {
         ArgumentNullException.ThrowIfNull(key);
 
@@ -152,6 +202,7 @@ public class WideDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
         return false;
     }
 
+    /// <inheritdoc />
     public bool Contains(KeyValuePair<TKey, TValue> item) {
         long index = FindEntryIndex(item.Key);
         if (index < 0)
@@ -162,6 +213,7 @@ public class WideDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
 
     bool IWideDictionary.Contains(object key) => key is TKey typedKey && ContainsKey(typedKey);
 
+    /// <inheritdoc />
     public bool Remove(KeyValuePair<TKey, TValue> item) {
         long index = FindEntryIndex(item.Key);
         if (index < 0)
@@ -180,6 +232,7 @@ public class WideDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
             Remove(typedKey);
     }
 
+    /// <inheritdoc />
     public void Clear() {
         if (_count == 0)
             return;
@@ -200,6 +253,7 @@ public class WideDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
         _version++;
     }
 
+    /// <inheritdoc />
     public void CopyTo(WideArray<KeyValuePair<TKey, TValue>> array, long arrayIndex) {
         ArgumentNullException.ThrowIfNull(array);
 
@@ -217,6 +271,7 @@ public class WideDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
         }
     }
 
+    /// <inheritdoc />
     public void Compact() {
         long liveCount = Count;
         if (liveCount == 0) {
@@ -254,6 +309,7 @@ public class WideDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
         _version++;
     }
 
+    /// <inheritdoc />
     public Enumerator GetEnumerator() => new(this);
 
     IEnumerator<KeyValuePair<TKey, TValue>> IEnumerable<KeyValuePair<TKey, TValue>>.GetEnumerator() => GetEnumerator();
@@ -379,6 +435,9 @@ public class WideDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
         ThrowOnExisting
     }
 
+    /// <summary>
+    /// Enumerates the key/value pairs of a <see cref="WideDictionary{TKey, TValue}"/>.
+    /// </summary>
     public struct Enumerator : IEnumerator<KeyValuePair<TKey, TValue>> {
         private readonly WideDictionary<TKey, TValue> _dictionary;
         private readonly long _version;
@@ -392,9 +451,11 @@ public class WideDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
             _current = default;
         }
 
+        /// <inheritdoc />
         public KeyValuePair<TKey, TValue> Current => _current;
         object IEnumerator.Current => _current;
 
+        /// <inheritdoc />
         public bool MoveNext() {
             if (_version != _dictionary._version)
                 throw new InvalidOperationException("Collection was modified during enumeration.");
@@ -413,6 +474,7 @@ public class WideDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
             return false;
         }
 
+        /// <inheritdoc />
         public void Reset() {
             if (_version != _dictionary._version)
                 throw new InvalidOperationException("Collection was modified during enumeration.");
@@ -421,6 +483,7 @@ public class WideDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
             _current = default;
         }
 
+        /// <inheritdoc />
         public void Dispose() { }
     }
 
@@ -430,11 +493,25 @@ public class WideDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
         private bool _valid;
         private DictionaryEntry _current;
 
+        /// <summary>
+        /// Gets the <see cref="DictionaryEntry"/> at the current position of the enumerator.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">The enumerator is not positioned on a valid element.</exception>
         public DictionaryEntry Entry => _valid ? _current : throw new InvalidOperationException("Enumerator is not on a valid element.");
+        /// <summary>
+        /// Gets the key of the current dictionary entry.
+        /// </summary>
         public object Key => Entry.Key;
+        /// <summary>
+        /// Gets the value of the current dictionary entry.
+        /// </summary>
         public object Value => Entry.Value;
+        /// <summary>
+        /// Gets the current dictionary entry.
+        /// </summary>
         public object Current => Entry;
 
+        /// <inheritdoc />
         public bool MoveNext() {
             if (_version != dictionary._version)
                 throw new InvalidOperationException("Collection was modified during enumeration.");
@@ -453,6 +530,7 @@ public class WideDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
             return false;
         }
 
+        /// <inheritdoc />
         public void Reset() {
             if (_version != dictionary._version)
                 throw new InvalidOperationException("Collection was modified during enumeration.");
@@ -469,7 +547,15 @@ public class WideDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
         internal KeyCollection(WideDictionary<TKey, TValue> dictionary) : base(dictionary.SyncRoot) 
             => _dictionary = dictionary;
 
+        /// <summary>
+        /// Gets the number of keys in the dictionary.
+        /// </summary>
         public override long Count => _dictionary.Count;
+        /// <summary>
+        /// Determines whether the collection contains the specified key.
+        /// </summary>
+        /// <param name="item">The key to locate.</param>
+        /// <returns><see langword="true"/> if the key is found; otherwise <see langword="false"/>.</returns>
         public override bool Contains(TKey item) => _dictionary.ContainsKey(item);
 
         protected override TKey GetElementAt(long index) {
@@ -485,6 +571,11 @@ public class WideDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
             throw new IndexOutOfRangeException();
         }
 
+        /// <summary>
+        /// Copies the keys of the dictionary into the specified array, starting at the given index.
+        /// </summary>
+        /// <param name="array">The destination array.</param>
+        /// <param name="arrayIndex">The zero-based index in <paramref name="array"/> at which copying begins.</param>
         public override void CopyTo(WideArray<TKey> array, long arrayIndex) {
             ArgumentNullException.ThrowIfNull(array);
             ArgumentOutOfRangeException.ThrowIfNegative(arrayIndex);
@@ -501,6 +592,10 @@ public class WideDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
             }
         }
 
+        /// <summary>
+        /// Returns an enumerator that iterates over the keys of the dictionary.
+        /// </summary>
+        /// <returns>An enumerator for the keys.</returns>
         public override IEnumerator<TKey> GetEnumerator() {
             for (long i = 0; i < _dictionary._count; i++) {
                 Entry entry = _dictionary._entries[i];
@@ -516,7 +611,15 @@ public class WideDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
         internal ValueCollection(WideDictionary<TKey, TValue> dictionary) : base(dictionary.SyncRoot) 
             => _dictionary = dictionary;
 
+        /// <summary>
+        /// Gets the number of values in the dictionary.
+        /// </summary>
         public override long Count => _dictionary.Count;
+        /// <summary>
+        /// Determines whether the collection contains the specified value.
+        /// </summary>
+        /// <param name="item">The value to locate.</param>
+        /// <returns><see langword="true"/> if the value is found; otherwise <see langword="false"/>.</returns>
         public override bool Contains(TValue item) {
             var comparer = EqualityComparer<TValue>.Default;
             for (long i = 0; i < _dictionary._count; i++) {
@@ -540,6 +643,11 @@ public class WideDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
             throw new IndexOutOfRangeException();
         }
 
+        /// <summary>
+        /// Copies the values of the dictionary into the specified array, starting at the given index.
+        /// </summary>
+        /// <param name="array">The destination array.</param>
+        /// <param name="arrayIndex">The zero-based index in <paramref name="array"/> at which copying begins.</param>
         public override void CopyTo(WideArray<TValue> array, long arrayIndex) {
             ArgumentNullException.ThrowIfNull(array);
             ArgumentOutOfRangeException.ThrowIfNegative(arrayIndex);
@@ -556,6 +664,10 @@ public class WideDictionary<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
             }
         }
 
+        /// <summary>
+        /// Returns an enumerator that iterates over the values of the dictionary.
+        /// </summary>
+        /// <returns>An enumerator for the values.</returns>
         public override IEnumerator<TValue> GetEnumerator() {
             for (long i = 0; i < _dictionary._count; i++) {
                 Entry entry = _dictionary._entries[i];

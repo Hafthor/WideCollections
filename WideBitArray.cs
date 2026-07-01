@@ -9,16 +9,25 @@ namespace com.hafthor.WideCollections;
 /// Provides thread-safe operations for setting and resetting bits.
 /// </summary>
 public class WideBitArray : IWideCollection, ICloneable, ISerializable {
-    private const int BitsPerLong = 64;
-    private const int BitsPerLongShift = 6; // log2(64)
-    private const int BitsPerLongMask = 63; // 2^6 - 1
+    private const int BitsPerLong = 64, BitsPerLongShift = 6, BitsPerLongMask = 63; // 64, log2(64), 2^6-1
     private readonly WideArray<ulong> _data;
     private long _bitLength;
 
+    /// <summary>
+    /// Gets the number of bits in the array.
+    /// </summary>
     public long Length => _bitLength;
 
+    /// <summary>
+    /// Initializes a new empty instance of the <see cref="WideBitArray"/> class.
+    /// </summary>
     public WideBitArray() => _data = new WideArray<ulong>();
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="WideBitArray"/> class with the specified bit length.
+    /// </summary>
+    /// <param name="bitCapacity">The number of bits the array contains.</param>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="bitCapacity"/> is negative.</exception>
     public WideBitArray(long bitCapacity) {
         ArgumentOutOfRangeException.ThrowIfNegative(bitCapacity);
 
@@ -27,6 +36,12 @@ public class WideBitArray : IWideCollection, ICloneable, ISerializable {
         _bitLength = bitCapacity;
     }
     
+    /// <summary>
+    /// Gets or sets the bit at the specified zero-based index.
+    /// </summary>
+    /// <param name="index">The zero-based bit index.</param>
+    /// <returns><see langword="true"/> if the bit is set; otherwise, <see langword="false"/>.</returns>
+    /// <exception cref="IndexOutOfRangeException"><paramref name="index"/> is outside the bounds of the array.</exception>
     public bool this[long index] {
         get {
             ValidateIndex(index);
@@ -44,6 +59,12 @@ public class WideBitArray : IWideCollection, ICloneable, ISerializable {
         }
     }
 
+    /// <summary>
+    /// Gets the bit at the specified zero-based index.
+    /// </summary>
+    /// <param name="index">The zero-based bit index.</param>
+    /// <returns><see langword="true"/> if the bit is set; otherwise, <see langword="false"/>.</returns>
+    /// <exception cref="IndexOutOfRangeException"><paramref name="index"/> is outside the bounds of the array.</exception>
     public bool Get(long index) {
         ValidateIndex(index);
         GetLongAndBitOffset(index, out long longIndex, out int bitOffset);
@@ -51,6 +72,11 @@ public class WideBitArray : IWideCollection, ICloneable, ISerializable {
         return (value & (1UL << bitOffset)) != 0;
     }
 
+    /// <summary>
+    /// Sets the bit at the specified zero-based index to <see langword="true"/>.
+    /// </summary>
+    /// <param name="index">The zero-based bit index.</param>
+    /// <exception cref="IndexOutOfRangeException"><paramref name="index"/> is outside the bounds of the array.</exception>
     public void Set(long index) {
         ValidateIndex(index);
         GetLongAndBitOffset(index, out long longIndex, out int bitOffset);
@@ -59,6 +85,11 @@ public class WideBitArray : IWideCollection, ICloneable, ISerializable {
         _data[longIndex] = current | mask;
     }
 
+    /// <summary>
+    /// Sets the bit at the specified zero-based index to <see langword="false"/>.
+    /// </summary>
+    /// <param name="index">The zero-based bit index.</param>
+    /// <exception cref="IndexOutOfRangeException"><paramref name="index"/> is outside the bounds of the array.</exception>
     public void Clear(long index) {
         ValidateIndex(index);
         GetLongAndBitOffset(index, out long longIndex, out int bitOffset);
@@ -70,6 +101,9 @@ public class WideBitArray : IWideCollection, ICloneable, ISerializable {
     /// <summary>
     /// Atomically sets or resets a bit in a thread-safe manner.
     /// </summary>
+    /// <param name="index">The zero-based bit index.</param>
+    /// <param name="value">The value to assign to the bit.</param>
+    /// <exception cref="IndexOutOfRangeException"><paramref name="index"/> is outside the bounds of the array.</exception>
     public void SetBitThreadSafe(long index, bool value) {
         ValidateIndex(index);
         GetLongAndBitOffset(index, out long longIndex, out int bitOffset);
@@ -90,6 +124,8 @@ public class WideBitArray : IWideCollection, ICloneable, ISerializable {
     /// <summary>
     /// Resizes the bit array to the specified bit length.
     /// </summary>
+    /// <param name="newBitLength">The new number of bits in the array.</param>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="newBitLength"/> is negative.</exception>
     public void Resize(long newBitLength) {
         ArgumentOutOfRangeException.ThrowIfNegative(newBitLength);
 
@@ -101,13 +137,27 @@ public class WideBitArray : IWideCollection, ICloneable, ISerializable {
         _bitLength = newBitLength;
     }
 
+    /// <summary>
+    /// Clears all bits in the array.
+    /// </summary>
     public void Clear() => _data.Clear();
 
+    /// <summary>
+    /// Sets every bit in the array to the specified value.
+    /// </summary>
+    /// <param name="value">The value to assign to each bit.</param>
     public void SetAll(bool value) {
         _data.Fill(value ? ulong.MaxValue : 0UL);
         ClearTrailingBits();
     }
 
+    /// <summary>
+    /// Applies a bitwise AND with another bit array to this instance.
+    /// </summary>
+    /// <param name="other">The bit array to combine with this instance.</param>
+    /// <returns>This instance after the operation has been applied.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="other"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException"><paramref name="other"/> has a different length than this instance.</exception>
     public WideBitArray And(WideBitArray other) {
         ValidateSameLength(other);
         if (_data.SegmentShift != other._data.SegmentShift)
@@ -122,6 +172,13 @@ public class WideBitArray : IWideCollection, ICloneable, ISerializable {
         return this;
     }
 
+    /// <summary>
+    /// Applies a bitwise OR with another bit array to this instance.
+    /// </summary>
+    /// <param name="other">The bit array to combine with this instance.</param>
+    /// <returns>This instance after the operation has been applied.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="other"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException"><paramref name="other"/> has a different length than this instance.</exception>
     public WideBitArray Or(WideBitArray other) {
         ValidateSameLength(other);
         if (_data.SegmentShift != other._data.SegmentShift)
@@ -136,6 +193,13 @@ public class WideBitArray : IWideCollection, ICloneable, ISerializable {
         return this;
     }
 
+    /// <summary>
+    /// Applies a bitwise exclusive OR with another bit array to this instance.
+    /// </summary>
+    /// <param name="other">The bit array to combine with this instance.</param>
+    /// <returns>This instance after the operation has been applied.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="other"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException"><paramref name="other"/> has a different length than this instance.</exception>
     public WideBitArray Xor(WideBitArray other) {
         ValidateSameLength(other);
         if (_data.SegmentShift != other._data.SegmentShift)
@@ -150,6 +214,10 @@ public class WideBitArray : IWideCollection, ICloneable, ISerializable {
         return this;
     }
 
+    /// <summary>
+    /// Inverts every bit in this instance.
+    /// </summary>
+    /// <returns>This instance after the operation has been applied.</returns>
     public WideBitArray Not() {
         foreach (ulong[] segmentData in _data.Segments)
             for (int i = 0; i < segmentData.Length; i++)
@@ -185,21 +253,27 @@ public class WideBitArray : IWideCollection, ICloneable, ISerializable {
         bitOffset = (int)(index & BitsPerLongMask);
     }
 
+    /// <inheritdoc />
     public IEnumerator GetEnumerator() {
         for (long i = 0; i < _bitLength; i++)
             yield return this[i];
     }
     
+    /// <inheritdoc />
     public long Count => _bitLength;
+    /// <inheritdoc />
     public object SyncRoot { get; } = new();
+    /// <inheritdoc />
     public bool IsSynchronized => false;
     
+    /// <inheritdoc />
     public object Clone() {
         WideBitArray clone = new(_bitLength);
         _data.CopyTo(clone._data, 0);
         return clone;
     }
 
+    /// <inheritdoc />
     public void GetObjectData(SerializationInfo info, StreamingContext context) {
         ArgumentNullException.ThrowIfNull(info);
         info.AddValue(nameof(_bitLength), _bitLength);

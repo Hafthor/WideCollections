@@ -10,22 +10,34 @@ public class WideList<T> : IWideList<T>, IWideList, IWideReadOnlyList<T>, IWideI
     private long _count;
     private static readonly bool ContainsReferences = RuntimeHelpers.IsReferenceOrContainsReferences<T>();
 
+    /// <inheritdoc />
     public long Count => _count;
+    /// <inheritdoc />
     public object SyncRoot { get; } = new();
+    /// <inheritdoc />
     public bool IsSynchronized => false;
+    /// <inheritdoc />
     public bool IsReadOnly => false;
+    /// <inheritdoc />
     public bool IsFixedSize => false;
     internal WideArray<T> Items { get; }
 
+    /// <inheritdoc />
     public long IndexOf(object value) => value is T item ? IndexOf(item) : -1;
 
+    /// <inheritdoc />
     public void Insert(long index, object value) => Insert(index, (T)value);
 
+    /// <inheritdoc />
     public void Remove(object value) {
         if (value is T item)
             Remove(item);
     }
 
+    /// <summary>
+    /// Gets or sets the number of elements the list can contain before resizing.
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException">The assigned value is less than <see cref="Count"/>.</exception>
     public long Capacity {
         get => Items.Length;
         set {
@@ -36,14 +48,28 @@ public class WideList<T> : IWideList<T>, IWideList, IWideReadOnlyList<T>, IWideI
         }
     }
 
+    /// <summary>
+    /// Initializes a new empty instance of the <see cref="WideList{T}"/> class.
+    /// </summary>
     public WideList() => Items = new();
 
+    /// <summary>
+    /// Initializes a new empty instance of the <see cref="WideList{T}"/> class with the specified initial capacity.
+    /// </summary>
+    /// <param name="capacity">The number of elements the list can initially store.</param>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="capacity"/> is negative.</exception>
     public WideList(long capacity) {
         ArgumentOutOfRangeException.ThrowIfNegative(capacity);
 
         Items = new WideArray<T>(capacity);
     }
 
+    /// <summary>
+    /// Gets the element at the specified zero-based index.
+    /// </summary>
+    /// <param name="index">The zero-based index of the element to get.</param>
+    /// <returns>The element at <paramref name="index"/>.</returns>
+    /// <exception cref="IndexOutOfRangeException"><paramref name="index"/> is outside the bounds of the list.</exception>
     public T Get(long index) {
         if (index < 0 || index >= _count)
             throw new IndexOutOfRangeException($"Index {index} is out of range for WideList of count {_count}.");
@@ -51,6 +77,12 @@ public class WideList<T> : IWideList<T>, IWideList, IWideReadOnlyList<T>, IWideI
         return Items[index];
     }
 
+    /// <summary>
+    /// Replaces the element at the specified zero-based index.
+    /// </summary>
+    /// <param name="index">The zero-based index of the element to replace.</param>
+    /// <param name="value">The value to store at <paramref name="index"/>.</param>
+    /// <exception cref="IndexOutOfRangeException"><paramref name="index"/> is outside the bounds of the list.</exception>
     public void Set(long index, T value) {
         if (index < 0 || index >= _count)
             throw new IndexOutOfRangeException($"Index {index} is out of range for WideList of count {_count}.");
@@ -58,11 +90,13 @@ public class WideList<T> : IWideList<T>, IWideList, IWideReadOnlyList<T>, IWideI
         Items[index] = value;
     }
 
+    /// <inheritdoc />
     public T this[long index] {
         get => Get(index);
         set => Set(index, value);
     }
 
+    /// <inheritdoc />
     public void Add(T item) {
         if (_count >= Items.Length)
             EnsureCapacity(_count + 1);
@@ -71,6 +105,11 @@ public class WideList<T> : IWideList<T>, IWideList, IWideReadOnlyList<T>, IWideI
         _count++;
     }
 
+    /// <summary>
+    /// Adds the elements of a collection to the end of the list.
+    /// </summary>
+    /// <param name="collection">The collection whose elements are added to the list.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="collection"/> is <see langword="null"/>.</exception>
     public void AddRange(IEnumerable<T> collection) {
         ArgumentNullException.ThrowIfNull(collection);
 
@@ -83,6 +122,13 @@ public class WideList<T> : IWideList<T>, IWideList, IWideReadOnlyList<T>, IWideI
             Add(item);
     }
 
+    /// <summary>
+    /// Inserts the elements of a collection into the list at the specified index.
+    /// </summary>
+    /// <param name="index">The zero-based index at which to insert the first element.</param>
+    /// <param name="collection">The collection whose elements are inserted into the list.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="collection"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="index"/> is negative or greater than <see cref="Count"/>.</exception>
     public void InsertRange(long index, IEnumerable<T> collection) {
         ArgumentOutOfRangeException.ThrowIfNegative(index);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(index, _count);
@@ -93,6 +139,12 @@ public class WideList<T> : IWideList<T>, IWideList, IWideReadOnlyList<T>, IWideI
             Insert(index + offset++, item);
     }
 
+    /// <summary>
+    /// Removes all elements that match the specified predicate.
+    /// </summary>
+    /// <param name="match">The predicate that identifies elements to remove.</param>
+    /// <returns>The number of elements removed from the list.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="match"/> is <see langword="null"/>.</exception>
     public long RemoveAll(Predicate<T> match) {
         ArgumentNullException.ThrowIfNull(match);
 
@@ -106,11 +158,15 @@ public class WideList<T> : IWideList<T>, IWideList, IWideReadOnlyList<T>, IWideI
         return removed;
     }
 
+    /// <summary>
+    /// Reverses the order of the elements in the list.
+    /// </summary>
     public void Reverse() {
         for (long lo = 0, hi = _count - 1; lo < hi; lo++, hi--)
             (Items[lo], Items[hi]) = (Items[hi], Items[lo]);
     }
 
+    /// <inheritdoc />
     public void Insert(long index, T item) {
         ArgumentOutOfRangeException.ThrowIfNegative(index);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(index, _count);
@@ -126,6 +182,7 @@ public class WideList<T> : IWideList<T>, IWideList, IWideReadOnlyList<T>, IWideI
         _count++;
     }
 
+    /// <inheritdoc />
     public void RemoveAt(long index) {
         if (index < 0 || index >= _count)
             throw new IndexOutOfRangeException($"Index {index} is out of range for WideList of count {_count}.");
@@ -139,6 +196,7 @@ public class WideList<T> : IWideList<T>, IWideList, IWideReadOnlyList<T>, IWideI
             Items[_count] = default!;
     }
 
+    /// <inheritdoc />
     public void CopyTo(WideArray<T> array, long arrayIndex) {
         ArgumentNullException.ThrowIfNull(array);
 
@@ -149,6 +207,7 @@ public class WideList<T> : IWideList<T>, IWideList, IWideReadOnlyList<T>, IWideI
         WideArray<T>.BulkCopy(Items, 0, array, arrayIndex, _count);
     }
 
+    /// <inheritdoc />
     public bool Remove(T item) {
         long index = IndexOf(item);
         if (index < 0)
@@ -158,6 +217,7 @@ public class WideList<T> : IWideList<T>, IWideList, IWideReadOnlyList<T>, IWideI
         return true;
     }
 
+    /// <inheritdoc />
     public long IndexOf(T item) {
         var comparer = EqualityComparer<T>.Default;
         for (long i = 0; i < _count; i++)
@@ -167,6 +227,7 @@ public class WideList<T> : IWideList<T>, IWideList, IWideReadOnlyList<T>, IWideI
         return -1;
     }
 
+    /// <inheritdoc />
     public bool Contains(T item) => IndexOf(item) >= 0;
 
     object IWideList.this[long index] {
@@ -174,13 +235,16 @@ public class WideList<T> : IWideList<T>, IWideList, IWideReadOnlyList<T>, IWideI
         set => this[index] = (T)value;
     }
 
+    /// <inheritdoc />
     public long Add(object value) {
         Add((T)value);
         return _count - 1;
     }
 
+    /// <inheritdoc />
     public bool Contains(object value) => Contains((T)value);
 
+    /// <inheritdoc />
     public void Clear() {
         if (_count > 0) {
             // Clear references for reference types
@@ -192,11 +256,34 @@ public class WideList<T> : IWideList<T>, IWideList, IWideReadOnlyList<T>, IWideI
         }
     }
 
+    /// <inheritdoc />
     public void Compact() => Capacity = _count;
 
+    /// <summary>
+    /// Creates a writable memory view over the elements in the list.
+    /// </summary>
+    /// <returns>A writable memory view over the entire list.</returns>
     public WideMemory<T> AsMemory() => new(this);
+    /// <summary>
+    /// Creates a writable memory view over a range of elements in the list.
+    /// </summary>
+    /// <param name="start">The zero-based index at which the view begins.</param>
+    /// <param name="length">The number of elements in the view.</param>
+    /// <returns>A writable memory view over the specified range.</returns>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="start"/> or <paramref name="length"/> is negative, or the range extends past <see cref="Count"/>.</exception>
     public WideMemory<T> AsMemory(long start, long length) => new WideMemory<T>(this).Slice(start, length);
+    /// <summary>
+    /// Creates a read-only memory view over the elements in the list.
+    /// </summary>
+    /// <returns>A read-only memory view over the entire list.</returns>
     public WideReadOnlyMemory<T> AsReadOnlyMemory() => new(this);
+    /// <summary>
+    /// Creates a read-only memory view over a range of elements in the list.
+    /// </summary>
+    /// <param name="start">The zero-based index at which the view begins.</param>
+    /// <param name="length">The number of elements in the view.</param>
+    /// <returns>A read-only memory view over the specified range.</returns>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="start"/> or <paramref name="length"/> is negative, or the range extends past <see cref="Count"/>.</exception>
     public WideReadOnlyMemory<T> AsReadOnlyMemory(long start, long length) => new WideReadOnlyMemory<T>(this).Slice(start, length);
 
     private void EnsureCapacity(long min) {
@@ -218,6 +305,8 @@ public class WideList<T> : IWideList<T>, IWideList, IWideReadOnlyList<T>, IWideI
     /// Returns the index of the item if found; otherwise, returns a negative value.
     /// The negative value is the bitwise complement of the index where the item should be inserted.
     /// </summary>
+    /// <param name="item">The item to locate in the sorted list.</param>
+    /// <returns>The zero-based index of <paramref name="item"/> if found; otherwise, the bitwise complement of the insertion index.</returns>
     public long BinarySearch(T item) {
         var comparer = Comparer<T>.Default;
         long left = 0;
@@ -243,6 +332,10 @@ public class WideList<T> : IWideList<T>, IWideList, IWideReadOnlyList<T>, IWideI
     /// Returns the index of the item if found; otherwise, returns a negative value.
     /// The negative value is the bitwise complement of the index where the item should be inserted.
     /// </summary>
+    /// <param name="item">The item to locate in the sorted list.</param>
+    /// <param name="comparer">The comparer used to order and compare elements.</param>
+    /// <returns>The zero-based index of <paramref name="item"/> if found; otherwise, the bitwise complement of the insertion index.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="comparer"/> is <see langword="null"/>.</exception>
     public long BinarySearch(T item, IComparer<T> comparer) {
         ArgumentNullException.ThrowIfNull(comparer);
 
@@ -264,6 +357,7 @@ public class WideList<T> : IWideList<T>, IWideList, IWideReadOnlyList<T>, IWideI
         return ~left;
     }
 
+    /// <inheritdoc />
     public IEnumerator<T> GetEnumerator() {
         for (long i = 0; i < _count; i++)
             yield return Items[i];

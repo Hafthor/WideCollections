@@ -2,41 +2,74 @@ using System.Collections;
 
 namespace com.hafthor.WideCollections;
 
+/// <summary>
+/// Represents a collection of key/value pairs that are sorted by key and accessible by key and by index.
+/// Backed by a <see cref="WideList{T}"/> so it can hold more than <see cref="int.MaxValue"/> elements.
+/// </summary>
 public class WideSortedList<TKey, TValue> : IWideDictionary<TKey, TValue>, IWideDictionary, 
     IWideReadOnlyDictionary<TKey, TValue>, ICompactable where TKey : notnull {
     private readonly WideList<KeyValuePair<TKey, TValue>> _items;
     private KeyCollection _keys;
     private ValueCollection _values;
 
+    /// <summary>
+    /// Initializes a new, empty instance of the <see cref="WideSortedList{TKey, TValue}"/> class
+    /// with the specified initial capacity and key comparer.
+    /// </summary>
+    /// <param name="capacity">The initial number of elements the list can hold before resizing.</param>
+    /// <param name="comparer">The comparer used to order keys, or <see langword="null"/> to use <see cref="Comparer{T}.Default"/>.</param>
     public WideSortedList(long capacity = 0, IComparer<TKey> comparer = null) : this(comparer) {
         ArgumentOutOfRangeException.ThrowIfNegative(capacity);
 
         _items.Capacity = capacity;
     }
 
+    /// <summary>
+    /// Initializes a new, empty instance of the <see cref="WideSortedList{TKey, TValue}"/> class
+    /// that orders keys using the specified comparer.
+    /// </summary>
+    /// <param name="comparer">The comparer used to order keys, or <see langword="null"/> to use <see cref="Comparer{T}.Default"/>.</param>
     public WideSortedList(IComparer<TKey> comparer) {
         _items = new WideList<KeyValuePair<TKey, TValue>>();
         Comparer = comparer ?? Comparer<TKey>.Default;
     }
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="WideSortedList{TKey, TValue}"/> class that contains
+    /// the key/value pairs copied from the specified collection, ordered by the specified comparer.
+    /// </summary>
+    /// <param name="collection">The collection whose key/value pairs are copied.</param>
+    /// <param name="comparer">The comparer used to order keys, or <see langword="null"/> to use <see cref="Comparer{T}.Default"/>.</param>
     public WideSortedList(IEnumerable<KeyValuePair<TKey, TValue>> collection, IComparer<TKey> comparer = null) : this(comparer) {
         ArgumentNullException.ThrowIfNull(collection);
         foreach (KeyValuePair<TKey, TValue> pair in collection)
             Add(pair.Key, pair.Value);
     }
 
+    /// <inheritdoc />
     public long Count => _items.Count;
+    /// <inheritdoc />
     public bool IsReadOnly => false;
+    /// <inheritdoc />
     public bool IsFixedSize => false;
+    /// <inheritdoc />
     public object SyncRoot { get; } = new();
+    /// <inheritdoc />
     public bool IsSynchronized => false;
+    /// <summary>
+    /// Gets the comparer used to order the keys of the list.
+    /// </summary>
     public IComparer<TKey> Comparer { get; }
 
+    /// <summary>
+    /// Gets or sets the number of elements the list can hold before its internal storage must resize.
+    /// </summary>
     public long Capacity {
         get => _items.Capacity;
         set => _items.Capacity = value;
     }
 
+    /// <inheritdoc />
     public TValue this[TKey key] {
         get {
             long index = FindIndex(key);
@@ -67,13 +100,16 @@ public class WideSortedList<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
         }
     }
 
+    /// <inheritdoc />
     public IWideCollection<TKey> Keys => _keys ??= new KeyCollection(this);
+    /// <inheritdoc />
     public IWideCollection<TValue> Values => _values ??= new ValueCollection(this);
     IEnumerable<TKey> IWideReadOnlyDictionary<TKey, TValue>.Keys => Keys;
     IEnumerable<TValue> IWideReadOnlyDictionary<TKey, TValue>.Values => Values;
     IWideCollection IWideDictionary.Keys => (IWideCollection)Keys;
     IWideCollection IWideDictionary.Values => (IWideCollection)Values;
 
+    /// <inheritdoc />
     public void Add(TKey key, TValue value) {
         long index = FindIndex(key);
         if (index >= 0)
@@ -90,10 +126,22 @@ public class WideSortedList<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
         Add((TKey)key, (TValue)value);
     }
 
+    /// <inheritdoc />
     public bool ContainsKey(TKey key) => FindIndex(key) >= 0;
 
+    /// <summary>
+    /// Determines whether the list contains an entry with the specified value.
+    /// </summary>
+    /// <param name="value">The value to locate.</param>
+    /// <returns><see langword="true"/> if the value is found; otherwise <see langword="false"/>.</returns>
     public bool ContainsValue(TValue value) => IndexOfValue(value) >= 0;
 
+    /// <summary>
+    /// Attempts to add the specified key and value to the list. Does nothing if the key already exists.
+    /// </summary>
+    /// <param name="key">The key of the element to add.</param>
+    /// <param name="value">The value of the element to add.</param>
+    /// <returns><see langword="true"/> if the key/value pair was added; <see langword="false"/> if the key already exists.</returns>
     public bool TryAdd(TKey key, TValue value) {
         long index = FindIndex(key);
         if (index >= 0)
@@ -102,6 +150,7 @@ public class WideSortedList<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
         return true;
     }
 
+    /// <inheritdoc />
     public bool TryGetValue(TKey key, out TValue value) {
         long index = FindIndex(key);
         if (index >= 0) {
@@ -113,6 +162,7 @@ public class WideSortedList<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
         return false;
     }
 
+    /// <inheritdoc />
     public bool Remove(TKey key) {
         long index = FindIndex(key);
         if (index < 0)
@@ -121,20 +171,49 @@ public class WideSortedList<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
         return true;
     }
 
+    /// <summary>
+    /// Returns the key at the specified index in the sorted order.
+    /// </summary>
+    /// <param name="index">The zero-based index of the key to retrieve.</param>
+    /// <returns>The key at <paramref name="index"/>.</returns>
     public TKey GetKeyAtIndex(long index) => _items[index].Key;
 
+    /// <summary>
+    /// Returns the value at the specified index in the sorted order.
+    /// </summary>
+    /// <param name="index">The zero-based index of the value to retrieve.</param>
+    /// <returns>The value at <paramref name="index"/>.</returns>
     public TValue GetValueAtIndex(long index) => _items[index].Value;
 
+    /// <summary>
+    /// Replaces the value stored at the specified index, leaving its key unchanged.
+    /// </summary>
+    /// <param name="index">The zero-based index of the entry to update.</param>
+    /// <param name="value">The new value to store.</param>
     public void SetValueAtIndex(long index, TValue value) => 
         _items[index] = new KeyValuePair<TKey, TValue>(_items[index].Key, value);
 
+    /// <summary>
+    /// Removes the entry at the specified index.
+    /// </summary>
+    /// <param name="index">The zero-based index of the entry to remove.</param>
     public void RemoveAt(long index) => _items.RemoveAt(index);
 
+    /// <summary>
+    /// Returns the index of the specified key in the sorted order.
+    /// </summary>
+    /// <param name="key">The key to locate.</param>
+    /// <returns>The zero-based index of the key, or -1 if the key is not found.</returns>
     public long IndexOfKey(TKey key) {
         long index = FindIndex(key);
         return index >= 0 ? index : -1;
     }
 
+    /// <summary>
+    /// Returns the index of the first entry that has the specified value.
+    /// </summary>
+    /// <param name="value">The value to locate.</param>
+    /// <returns>The zero-based index of the first matching value, or -1 if no entry has the value.</returns>
     public long IndexOfValue(TValue value) {
         var comparer = EqualityComparer<TValue>.Default;
         for (long i = 0; i < Count; i++)
@@ -144,6 +223,7 @@ public class WideSortedList<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
         return -1;
     }
 
+    /// <inheritdoc />
     public bool Contains(KeyValuePair<TKey, TValue> item) {
         long index = FindIndex(item.Key);
         if (index < 0)
@@ -153,6 +233,7 @@ public class WideSortedList<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
 
     bool IWideDictionary.Contains(object key) => key is TKey typedKey && ContainsKey(typedKey);
 
+    /// <inheritdoc />
     public bool Remove(KeyValuePair<TKey, TValue> item) {
         if (!Contains(item))
             return false;
@@ -166,10 +247,17 @@ public class WideSortedList<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
             Remove(typedKey);
     }
 
+    /// <inheritdoc />
     public void Clear() => _items.Clear();
 
+    /// <inheritdoc />
     public void Compact() => _items.Compact();
 
+    /// <summary>
+    /// Ensures that the list can hold at least the specified number of elements without resizing.
+    /// </summary>
+    /// <param name="capacity">The minimum required capacity.</param>
+    /// <returns>The capacity of the list after the call.</returns>
     public long EnsureCapacity(long capacity) {
         ArgumentOutOfRangeException.ThrowIfNegative(capacity);
         if (_items.Capacity < capacity)
@@ -177,8 +265,12 @@ public class WideSortedList<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
         return _items.Capacity;
     }
 
+    /// <summary>
+    /// Reduces the capacity of the list to match the current number of elements.
+    /// </summary>
     public void TrimExcess() => _items.Capacity = _items.Count;
 
+    /// <inheritdoc />
     public void CopyTo(WideArray<KeyValuePair<TKey, TValue>> array, long arrayIndex) {
         ArgumentNullException.ThrowIfNull(array);
 
@@ -190,6 +282,7 @@ public class WideSortedList<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
             array[arrayIndex + i] = _items[i];
     }
 
+    /// <inheritdoc />
     public Enumerator GetEnumerator() => new(this);
 
     IEnumerator<KeyValuePair<TKey, TValue>> IEnumerable<KeyValuePair<TKey, TValue>>.GetEnumerator() => GetEnumerator();
@@ -229,6 +322,9 @@ public class WideSortedList<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
         return ~lo;
     }
 
+    /// <summary>
+    /// Enumerates the key/value pairs of a <see cref="WideSortedList{TKey, TValue}"/> in key order.
+    /// </summary>
     public struct Enumerator : IEnumerator<KeyValuePair<TKey, TValue>> {
         private readonly WideSortedList<TKey, TValue> _list;
         private long _index;
@@ -240,9 +336,11 @@ public class WideSortedList<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
             _current = default;
         }
 
+        /// <inheritdoc />
         public KeyValuePair<TKey, TValue> Current => _current;
         object IEnumerator.Current => _current;
 
+        /// <inheritdoc />
         public bool MoveNext() {
             if (_index < _list.Count) {
                 _current = _list._items[_index];
@@ -255,11 +353,13 @@ public class WideSortedList<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
             return false;
         }
 
+        /// <inheritdoc />
         public void Reset() {
             _index = 0;
             _current = default;
         }
 
+        /// <inheritdoc />
         public void Dispose() { }
     }
 
@@ -267,6 +367,10 @@ public class WideSortedList<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
         private Enumerator _enumerator = list.GetEnumerator();
         private bool _valid;
 
+        /// <summary>
+        /// Gets the <see cref="DictionaryEntry"/> at the current position of the enumerator.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">The enumerator is not positioned on a valid element.</exception>
         public DictionaryEntry Entry {
             get {
                 if (!_valid)
@@ -277,15 +381,26 @@ public class WideSortedList<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
             }
         }
 
+        /// <summary>
+        /// Gets the key of the current dictionary entry.
+        /// </summary>
         public object Key => Entry.Key;
+        /// <summary>
+        /// Gets the value of the current dictionary entry.
+        /// </summary>
         public object Value => Entry.Value;
+        /// <summary>
+        /// Gets the current dictionary entry.
+        /// </summary>
         public object Current => Entry;
 
+        /// <inheritdoc />
         public bool MoveNext() {
             _valid = _enumerator.MoveNext();
             return _valid;
         }
 
+        /// <inheritdoc />
         public void Reset() {
             _enumerator.Reset();
             _valid = false;
@@ -298,7 +413,15 @@ public class WideSortedList<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
         internal KeyCollection(WideSortedList<TKey, TValue> list) : base(list.SyncRoot)
             => _list = list;
 
+        /// <summary>
+        /// Gets the number of keys in the list.
+        /// </summary>
         public override long Count => _list.Count;
+        /// <summary>
+        /// Determines whether the collection contains the specified key.
+        /// </summary>
+        /// <param name="item">The key to locate.</param>
+        /// <returns><see langword="true"/> if the key is found; otherwise <see langword="false"/>.</returns>
         public override bool Contains(TKey item) => _list.ContainsKey(item);
 
         protected override TKey GetElementAt(long index) => _list._items[(int)index].Key;
@@ -310,7 +433,15 @@ public class WideSortedList<TKey, TValue> : IWideDictionary<TKey, TValue>, IWide
         internal ValueCollection(WideSortedList<TKey, TValue> list) : base(list.SyncRoot)
             => _list = list;
 
+        /// <summary>
+        /// Gets the number of values in the list.
+        /// </summary>
         public override long Count => _list.Count;
+        /// <summary>
+        /// Determines whether the collection contains the specified value.
+        /// </summary>
+        /// <param name="item">The value to locate.</param>
+        /// <returns><see langword="true"/> if the value is found; otherwise <see langword="false"/>.</returns>
         public override bool Contains(TValue item) {
             var comparer = EqualityComparer<TValue>.Default;
             for (long i = 0; i < _list.Count; i++) {
