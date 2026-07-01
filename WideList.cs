@@ -196,6 +196,33 @@ public class WideList<T> : IWideList<T>, IWideList, IWideReadOnlyList<T>, IWideI
             Items[_count] = default!;
     }
 
+    /// <summary>
+    /// Removes a range of elements from the list.
+    /// </summary>
+    /// <param name="index">The zero-based starting index of the range to remove.</param>
+    /// <param name="count">The number of elements to remove.</param>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="index"/> or <paramref name="count"/> is negative, or they do not denote a valid range of elements in the list.</exception>
+    public void RemoveRange(long index, long count) {
+        ArgumentOutOfRangeException.ThrowIfNegative(index);
+        ArgumentOutOfRangeException.ThrowIfNegative(count);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(count, _count - index);
+
+        if (count == 0)
+            return;
+
+        // Shift the tail left over the removed range in one bulk copy.
+        long tail = _count - (index + count);
+        if (tail > 0)
+            WideArray<T>.BulkCopy(Items, index + count, Items, index, tail);
+
+        long newCount = _count - count;
+        if (ContainsReferences)
+            for (long i = newCount; i < _count; i++)
+                Items[i] = default!;
+
+        _count = newCount;
+    }
+
     /// <inheritdoc />
     public void CopyTo(WideArray<T> array, long arrayIndex) {
         ArgumentNullException.ThrowIfNull(array);

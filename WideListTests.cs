@@ -240,4 +240,58 @@ public sealed class WideListTests {
         GC.WaitForPendingFinalizers();
         GC.Collect();
     }
+
+    [TestMethod]
+    public void RemoveRange_RemovesMiddleAndShiftsTail() {
+        WideList<int> list = new();
+        list.AddRange(new[] { 1, 2, 3, 4, 5, 6 });
+
+        list.RemoveRange(1, 3);
+
+        Assert.AreEqual(3L, list.Count);
+        CollectionAssert.AreEqual(new[] { 1, 5, 6 }, list.ToArray());
+    }
+
+    [TestMethod]
+    public void RemoveRange_ToEnd_And_ZeroCount() {
+        WideList<int> list = new();
+        list.AddRange(new[] { 1, 2, 3, 4 });
+
+        list.RemoveRange(2, 0);
+        Assert.AreEqual(4L, list.Count);
+
+        list.RemoveRange(2, 2);
+        CollectionAssert.AreEqual(new[] { 1, 2 }, list.ToArray());
+    }
+
+    [TestMethod]
+    public void RemoveRange_OutOfRange_Throws() {
+        WideList<int> list = new();
+        list.AddRange(new[] { 1, 2, 3 });
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => list.RemoveRange(1, 5));
+        Assert.Throws<ArgumentOutOfRangeException>(() => list.RemoveRange(-1, 1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => list.RemoveRange(1, -1));
+    }
+
+    [TestMethod]
+    public void RemoveRange_ClearsRemovedReferencesForGarbageCollection() {
+        WideList<object> list = new(4);
+        WeakReference weak = AddRangeAndRemoveRange(list);
+
+        ForceGc();
+
+        Assert.IsFalse(weak.IsAlive);
+    }
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    private static WeakReference AddRangeAndRemoveRange(WideList<object> list) {
+        object keep = new();
+        object payload = new();
+        WeakReference weak = new(payload);
+        list.Add(keep);
+        list.Add(payload);
+        list.RemoveRange(1, 1);
+        return weak;
+    }
 }
