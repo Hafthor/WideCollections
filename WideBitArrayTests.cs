@@ -1,5 +1,3 @@
-using System.Runtime.Serialization;
-
 namespace com.hafthor.WideCollections;
 
 [TestClass]
@@ -92,19 +90,6 @@ public sealed class WideBitArrayTests {
         Assert.IsTrue(clone[5]);
         Assert.IsTrue(clone[64]);
         Assert.IsFalse(bits[5]);
-    }
-
-    [TestMethod]
-    public void GetObjectData_PopulatesSerializationInfo() {
-        WideBitArray bits = new(70);
-        bits.Set(64);
-        SerializationInfo info = new(typeof(WideBitArray), new FormatterConverter());
-
-        bits.GetObjectData(info, new StreamingContext());
-
-        Assert.AreEqual(70L, info.GetInt64("_bitLength"));
-        ulong[] data = (ulong[])info.GetValue("_data", typeof(ulong[]));
-        Assert.AreEqual(1UL, data[1]);
     }
 
     [TestMethod]

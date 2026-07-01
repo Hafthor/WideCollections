@@ -1,6 +1,5 @@
 using System.Collections;
 using System.Runtime.CompilerServices;
-using System.Runtime.Serialization;
 
 namespace com.hafthor.WideCollections;
 
@@ -8,7 +7,7 @@ namespace com.hafthor.WideCollections;
 /// A bit array backed by WideArray that can hold more bits than Array.MaxLength.
 /// Provides thread-safe operations for setting and resetting bits.
 /// </summary>
-public class WideBitArray : IWideCollection, ICloneable, ISerializable {
+public class WideBitArray : IWideCollection, ICloneable {
     private const int BitsPerLong = 64, BitsPerLongShift = 6, BitsPerLongMask = 63; // 64, log2(64), 2^6-1
     private readonly WideArray<ulong> _data;
     private long _bitLength;
@@ -271,15 +270,5 @@ public class WideBitArray : IWideCollection, ICloneable, ISerializable {
         WideBitArray clone = new(_bitLength);
         _data.CopyTo(clone._data, 0);
         return clone;
-    }
-
-    /// <inheritdoc />
-    public void GetObjectData(SerializationInfo info, StreamingContext context) {
-        ArgumentNullException.ThrowIfNull(info);
-        info.AddValue(nameof(_bitLength), _bitLength);
-        ulong[] data = new ulong[_data.Length];
-        for (long i = 0; i < _data.Length; i++)
-            data[i] = _data[i];
-        info.AddValue(nameof(_data), data);
     }
 }
