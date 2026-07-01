@@ -21,7 +21,7 @@ Target framework: **net10.0**.
 | Type | BCL analog | Notes |
 |------|------------|-------|
 | `WideArray<T>` | `T[]` | Fixed-length, segmented, `long` indexed, `Clone`/`Fill`/`AsMemory` |
-| `WideList<T>` | `List<T>` | Grows dynamically; `AddRange`, `InsertRange`, `RemoveAll`, `Reverse` |
+| `WideList<T>` | `List<T>` | Grows dynamically; `AddRange`, `InsertRange`, `RemoveRange`, `RemoveAll`, `Reverse` |
 | `WideDictionary<TKey,TValue>` | `Dictionary<,>` | Open hashing; `TryAdd`, `Compact` |
 | `WideHashSet<T>` | `HashSet<T>` | Set ops, `Compact` |
 | `WideSortedSet<T>` | `SortedSet<T>` | Binary search; `GetViewBetween`, `GetViewMemoryBetween` |
@@ -33,6 +33,8 @@ Target framework: **net10.0**.
 | `WidePriorityQueue<TElement,TPriority>` | `PriorityQueue<,>` | Heap; `Contains`, `Remove` |
 | `WideBitArray` | `BitArray` | `And/Or/Xor/Not/SetAll`, thread-safe set |
 | `WideMemory<T>` / `WideReadOnlyMemory<T>` | `Memory<T>` | `long`-sliceable views |
+| `WideString` | `string` | Immutable `long`-length char sequence; `Substring`, `Concat`, `IndexOf`, `StartsWith`/`EndsWith` |
+| `WideStringBuilder` | `StringBuilder` | Mutable `long`-length char buffer; chainable `Append`/`Insert`/`Remove` |
 
 All types live in the `com.hafthor.WideCollections` namespace.
 
@@ -55,6 +57,15 @@ dict.TryAdd("answer", 42);
 // Sorted set with range views
 var set = new WideSortedSet<int>(new[] { 1, 2, 3, 4, 5 });
 WideMemory<int> slice = set.GetViewMemoryBetween(2, 4); // 2,3,4
+
+// Wide strings
+WideString greeting = "hello";
+WideString shout = greeting + " world";        // immutable concat
+long idx = shout.IndexOf('w');                  // 6
+
+var sb = new WideStringBuilder();
+sb.Append("wide").Append('-').Append("string"); // chainable
+WideString result = sb.ToWideString();          // independent snapshot
 ```
 
 ## LINQ-style extensions
